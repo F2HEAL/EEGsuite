@@ -1,0 +1,24 @@
+Channel:
+  Start: 1
+  End: 1  
+  Steps: 1
+
+Volume:
+  Start: 100     
+  End: 100
+  Steps: 10
+
+Frequency:
+  Start: 32
+  End: 32
+  Steps: 2
+
+Baselines:
+  Baseline_1: 3
+  Baseline_2: 4
+  Baseline_3: 5
+
+Measurements:
+  Number: 2
+  Duration_on: 1
+  Duration_off: 0.5

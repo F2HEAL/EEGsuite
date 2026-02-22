@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eegsuite"
+version = "0.1.0"
+description = "F2H EEG Software Suite"
+requires-python = ">=3.11"
+dependencies = [
+    "brainflow",
+    "pylsl",
+    "pyyaml",
+    "pyserial",
+    "numpy",
+]
+
+[project.scripts]
+eegsuite = "src.main:main"

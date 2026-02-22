@@ -1,0 +1,6 @@
+pylsl
+mne
+mne-lsl
+pyyaml
+scipy
+pandas

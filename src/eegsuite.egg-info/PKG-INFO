@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: eegsuite
+Version: 0.1.0
+Summary: F2H EEG Software Suite
+Requires-Python: >=3.11
+Requires-Dist: brainflow
+Requires-Dist: pylsl
+Requires-Dist: pyyaml
+Requires-Dist: pyserial
+Requires-Dist: numpy

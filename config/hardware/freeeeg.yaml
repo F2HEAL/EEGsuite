@@ -1,0 +1,11 @@
+Board:
+  Id: FREEEEG32_BOARD
+  Master: null
+  Mac: null
+  File: null
+  Serial: "COM3" # WINDOWS
+  Keep_ble_alive: false
+  StreamName: "BrainFlowEEG"
+
+VHP:
+  Serial: "COM5" # WINDOWS
