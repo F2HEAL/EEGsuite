@@ -90,7 +90,7 @@ def main():
             start=args.start,
             duration=args.duration
         )
-        logger.info("✅ Analysis complete. Report: %s", report_path)
+        logger.info("Analysis complete. Report: %s", report_path)
 
     else:
         parser.print_help()

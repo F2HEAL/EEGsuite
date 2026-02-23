@@ -20,6 +20,10 @@ default_start_time: 0.0
 default_duration: 10.0
 psd_fmin: 1.0
 psd_fmax: 60.0
+pick_channels: [Iz]               # Channels to show in the entire report
+
+# ERP settings
+erp_duration: 1.1                 # Length of ERP window in seconds
 
 # Report settings
 output_dir: "reports"

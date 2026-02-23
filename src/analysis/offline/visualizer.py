@@ -124,6 +124,14 @@ class EEGVisualizer:
         # Add annotations
         self._add_annotations(timestamps, markers)
 
+        # Apply global channel picking
+        picks = self.config.get('pick_channels')
+        if picks:
+            valid_picks = [ch for ch in picks if ch in self.raw.ch_names]
+            if valid_picks:
+                self.raw.pick_channels(valid_picks)
+                logger.info("Global channel pick applied: %s", valid_picks)
+
     def _add_annotations(self, timestamps, markers):
         valid_mask = ~np.isnan(markers)
         if not np.any(valid_mask):
@@ -158,29 +166,147 @@ class EEGVisualizer:
         data, times = self.raw[:, start_idx:stop_idx]
         
         fig, ax = plt.subplots(figsize=(15, 8))
-        # Plot only first channel or average for simplicity in this native version
+        # Plot only first channel for clarity
         ax.plot(times, data[0], color='black', lw=0.5, alpha=0.7)
         ax.set_title(f"EEG Timeseries (Channel 1) - {t_start:.1f}s to {t_end:.1f}s")
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Amplitude (µV)")
         
-        # Add event lines
+        # Add event markers with the correct labels
         if self.raw.annotations:
             for annot in self.raw.annotations:
-                if t_start <= annot['onset'] <= t_end:
-                    color = 'green' if 'ON' in annot['description'] else 'red' if 'OFF' in annot['description'] else 'orange'
-                    ax.axvline(annot['onset'], color=color, linestyle='--', alpha=0.8)
-                    ax.text(annot['onset'], ax.get_ylim()[1], annot['description'], 
-                            rotation=90, va='top', fontsize=8)
+                onset = annot['onset']
+                if t_start <= onset <= t_end:
+                    desc = annot['description']
+                    color = 'green' if '[1]' in desc else 'red' if '[11]' in desc else 'orange'
+                    ax.axvline(onset, color=color, linestyle='--', alpha=0.8)
+                    ax.text(onset, ax.get_ylim()[1], desc, 
+                            rotation=90, va='top', fontsize=8,
+                            bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7))
         
         plt.tight_layout()
         return fig
+
+    def create_psd_plot(self):
+        """Create PSD plot"""
+        fmin, fmax = self.config.get('psd_fmin', 1.0), self.config.get('psd_fmax', 60.0)
+        try:
+            psd = self.raw.compute_psd(fmin=fmin, fmax=fmax, method='welch')
+            fig = psd.plot(average=True, show=False)
+            fig.axes[0].set_title(f'Power Spectral Density ({fmin}-{fmax} Hz)')
+            return fig
+        except Exception as e:
+            logger.error("Error creating PSD plot: %s", e)
+            return None
+
+    def create_erp_plot(self, event_type: str = 'Stimulation ON [1]'):
+        """Create ERP plot for specific event type on selected channels."""
+        if not self.raw.annotations:
+            logger.warning("No annotations found in raw data.")
+            return None
+        
+        events, event_id = mne.events_from_annotations(self.raw)
+        logger.info("Found event IDs: %s", event_id)
+        
+        if event_type not in event_id:
+            logger.warning("Event type '%s' not found in data.", event_type)
+            return None
+            
+        target_id = event_id[event_type]
+        n_occurrences = np.sum(events[:, 2] == target_id)
+        logger.info("Event '%s' (ID %d) occurs %d times in annotations.", 
+                    event_type, target_id, n_occurrences)
+            
+        # Get settings from config
+        tmax = self.config.get('erp_duration', 1.0)
+                
+        try:
+            # We use the specific ID for this event type
+            epochs = mne.Epochs(self.raw, events, event_id=target_id,
+                               tmin=-0.2, tmax=tmax, baseline=(-0.2, 0),
+                               preload=True, verbose=True,
+                               on_missing='warning')
+            
+            # Log why epochs were dropped
+            if len(epochs.drop_log) > 0:
+                for i, log in enumerate(epochs.drop_log):
+                    if log:
+                        logger.warning("Epoch %d dropped because: %s", i, log)
+
+            logger.info("Created %d epochs for '%s'.", len(epochs), event_type)
+            
+            if len(epochs) == 0:
+                return None
+            evoked = epochs.average()
+            
+            # Use evoked.plot() but handle title manually to avoid NameError
+            fig = evoked.plot(show=False)
+            ch_info = ", ".join(evoked.ch_names)
+            fig.suptitle(f'ERP: {event_type} (n={len(epochs)}, Channels: {ch_info})', y=1.02)
+            return fig
+        except Exception as e:
+            logger.error("Error creating ERP plot for %s: %s", event_type, e)
+            return None
+
+    def create_frequency_band_plot(self, band_name: str, fmin: float, fmax: float):
+        """Create plot for specific frequency band."""
+        try:
+            psd = self.raw.compute_psd(fmin=fmin, fmax=fmax, method='welch')
+            fig = psd.plot(average=False, show=False, spatial_colors=False)
+            fig.axes[0].set_title(f'{band_name} ({fmin}-{fmax} Hz) Power by Channel')
+            return fig
+        except Exception as e:
+            logger.error("Error creating %s plot: %s", band_name, e)
+            return None
+
+    def create_stim_comparison_plot(self):
+        """Compare Stimulation ON vs Baseline1."""
+        if not self.raw.annotations:
+            return None
+            
+        try:
+            # Find first Stim ON and first Baseline1
+            stim_onset = None
+            base_onset = None
+            for onset, desc in zip(self.raw.annotations.onset, self.raw.annotations.description):
+                if 'Stimulation ON [1]' in desc and stim_onset is None:
+                    stim_onset = onset
+                if 'Baseline_VHP_OFF [3]' in desc and base_onset is None:
+                    base_onset = onset
+            
+            if stim_onset is None or base_onset is None:
+                return None
+                
+            duration = 5.0 # Compare 5 seconds
+            raw_stim = self.raw.copy().crop(tmin=stim_onset, tmax=min(stim_onset + duration, self.raw.times[-1]))
+            raw_base = self.raw.copy().crop(tmin=base_onset, tmax=min(base_onset + duration, self.raw.times[-1]))
+            
+            psd_stim = raw_stim.compute_psd(fmin=1, fmax=55, method='welch')
+            psd_base = raw_base.compute_psd(fmin=1, fmax=55, method='welch')
+            
+            fig, ax = plt.subplots(figsize=(10, 6))
+            freqs = psd_stim.freqs
+            data_stim = 10 * np.log10(psd_stim.get_data().mean(axis=0))
+            data_base = 10 * np.log10(psd_base.get_data().mean(axis=0))
+            
+            ax.plot(freqs, data_base, color='gray', alpha=0.6, label='Baseline (VHP OFF)')
+            ax.plot(freqs, data_stim, color='green', label='Stimulation ON', linewidth=2)
+            ax.set_title('Stimulation vs. Baseline Power Spectrum')
+            ax.set_xlabel('Frequency (Hz)')
+            ax.set_ylabel('Power (dB)')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            plt.tight_layout()
+            return fig
+        except Exception as e:
+            logger.error("Error creating comparison plot: %s", e)
+            return None
 
     def generate_report(self, csv_file: Path, output_dir: Path, start: float, duration: float):
         """Generates the full HTML report."""
         report = SimpleReport(output_dir, title=f"EEG Analysis: {csv_file.name}")
         
-        # Info section
+        # 1. Info section
         info = {
             "File": str(csv_file),
             "Duration (s)": round(self.raw.times[-1], 2),
@@ -190,10 +316,40 @@ class EEGVisualizer:
         }
         report.add_section("File Information", content=info)
         
-        # Timeseries section
-        fig = self.create_timeseries_plot(start, duration)
-        report.add_section("Timeseries Analysis", plot=fig, 
+        # 2. Timeseries section
+        fig_ts = self.create_timeseries_plot(start, duration)
+        report.add_section("Timeseries Analysis", plot=fig_ts, 
                           plot_caption=f"Segment from {start}s with {duration}s duration")
+        
+        # 3. PSD section
+        fig_psd = self.create_psd_plot()
+        if fig_psd:
+            report.add_section("Power Spectral Density", plot=fig_psd,
+                              plot_caption="Average power spectral density across all channels")
+            
+        # 4. ERP section
+        fig_erp = self.create_erp_plot('Stimulation ON [1]')
+        if fig_erp:
+            report.add_section("Event-Related Potential (ERP)", plot=fig_erp,
+                              plot_caption="ERP for Stimulation ON [1] events")
+            
+        # 5. Stimulation Comparison
+        fig_comp = self.create_stim_comparison_plot()
+        if fig_comp:
+            report.add_section("Stimulation vs Baseline", plot=fig_comp,
+                              plot_caption="Comparison of PSD: Stimulation ON (Green) vs Baseline (Gray)")
+            
+        # 6. Frequency Bands
+        freq_bands = {
+            'Alpha (8-13 Hz)': (8, 13),
+            'Beta (13-30 Hz)': (13, 30),
+            'Gamma (30-45 Hz)': (30, 45)
+        }
+        for band_name, (fmin, fmax) in freq_bands.items():
+            fig_band = self.create_frequency_band_plot(band_name, fmin, fmax)
+            if fig_band:
+                report.add_section(f"Frequency Band: {band_name}", plot=fig_band,
+                                  plot_caption=f"Power distribution for {band_name}")
         
         report_path = report.save(f"{csv_file.stem}_report.html")
         return report_path
