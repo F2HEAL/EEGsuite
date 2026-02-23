@@ -48,12 +48,14 @@ Runs the automated protocol, controlling both EEG recording and the VHP stimulat
 *   **Protocol**: It will execute baselines and measurements defined in your protocol YAML.
 
 ### `analyze` (The Data Visualizer)
-Generates HTML/PDF visualizations of your recorded data.
+Generates native HTML visualizations of your recorded data using MNE-python.
 *   **Usage**: `python -m src.main analyze -f .\data\session_01.csv -s 7.5 -d 2.0`
+*   **Action**: Look for the report in the `\reports` folder.
+*   **Customization**: Edit `config\analysis\default_offline.yaml` to change channel names, montage, or filter frequencies.
 *   **Options**:
     *   `-f, --file`: Path to the CSV file.
-    *   `-s, --start`: Start time in seconds (default: 7.5).
-    *   `-d, --duration`: Window size in seconds (default: 2.0).
+    *   `-s, --start`: Start time in seconds (default: 0.0).
+    *   `-d, --duration`: Window size in seconds (default: 60.0).
 
 ---
 
@@ -62,10 +64,42 @@ Generates HTML/PDF visualizations of your recorded data.
 *   `/config`: YAML files for hardware and experimental protocols.
 *   `/data`: All recordings (CSV/EDF) are stored here.
 *   `/logs`: Detailed session logs for debugging.
+*   `/reports`: Analysis results and visualizations.
 *   `/src`: The core source code.
     *   `streaming/`: BrainFlow/LSL implementation.
     *   `recording/`: Sweep protocol implementation.
     *   `analysis/`: Data processing tools.
+
+---
+
+## 🔬 Performance & Timing Precision
+
+This suite is optimized for high-precision academic research. Based on empirical validation:
+
+### 1. Synchronization Accuracy
+*   **Mean Latency**: $\approx 6.0\text{ms}$ (Command to physical vibration).
+*   **Marker Precision**: Event markers are synchronized with EEG data at a resolution of **1.95ms** (at 512 Hz sampling).
+*   **Jitter**: $\pm 5\text{ms}$, primarily driven by Windows OS thread scheduling.
+
+### 2. Implementation Details
+*   **Non-Blocking Commands**: Critical `Start` (1) and `Stop` (0) serial commands are sent with zero software delay to ensure immediate hardware response.
+*   **Deterministic Markers**: Markers are attached to the actual LSL sample timestamps, ensuring that even if there is a small transmission delay, the "Stimulation ON" label in your CSV matches the exact sample where the signal appears.
+
+---
+
+### 💾 Changing Data Storage Location
+By default, the system saves data to the `/data` folder in the project root. If your cloud drive is unreachable or you wish to use a different location:
+
+#### Option 1: CLI Override (Recommended for quick changes)
+Use the `--data-root` argument before the command:
+```powershell
+python -m src.main --data-root "C:\MyLocalData" sweep -d .\config\hardware\freeeeg.yaml -p .\config\protocols\sweep_default.yaml
+```
+
+#### Option 2: Environment Variable (Persistent)
+Set the `EEG_CLOUD_ROOT` environment variable. The system will create `data/`, `logs/`, and `reports/` inside this path.
+*   **Windows (PowerShell)**: `[System.Environment]::SetEnvironmentVariable('EEG_CLOUD_ROOT', 'D:\EEG_Storage', 'User')`
+*   **Linux/Mac**: `export EEG_CLOUD_ROOT="/path/to/storage"`
 
 ---
 

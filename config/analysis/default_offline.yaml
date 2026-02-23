@@ -1,0 +1,25 @@
+# EEG Analysis Configuration
+# ---------------------------
+
+# Channel Mapping for FreeEEG32 (standard 10-20 system if applicable)
+channels: [
+    Iz, PO9, PO10, O1, O2, P7, P3, Pz,
+    P4, P8,  TP9,  TP10, CP5, CP1, CP2, CP6,
+    T7, T8, C3, Cz, C4, FC5, FC1, FC2,
+    FC6, FT9, FT10, F7, F3, Fz, F4, F8, ]
+
+montage: easycap-M1
+
+# Filtering settings
+fmin: 1.5
+fmax: 100.0
+notch_freqs: [50, 100]
+
+# Visualization defaults
+default_start_time: 0.0
+default_duration: 10.0
+psd_fmin: 1.0
+psd_fmax: 60.0
+
+# Report settings
+output_dir: "reports"

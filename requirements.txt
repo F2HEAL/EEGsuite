@@ -4,3 +4,4 @@ mne-lsl
 pyyaml
 scipy
 pandas
+matplotlib

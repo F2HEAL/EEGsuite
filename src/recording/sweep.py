@@ -44,15 +44,35 @@ class SerialCommunicator:
             self.ser = serial.Serial(port=port, baudrate=self.BAUDRATE, timeout=self.TIMEOUT)
             if not self.ser.is_open:
                 self.ser.open()
+            print(f"DEBUG: Serial port {port} opened successfully.")
             time.sleep(2)
         except serial.SerialException as e:
             logger.error("Could not open serial port %s: %s", port, e)
             raise
 
-    def send_command(self, cmd: str) -> None:
-        """Sends a command to the serial device."""
-        self.ser.write(f"{cmd}\n".encode())
-        logger.debug("Sent serial command: %s", cmd)
+    def send_command(self, cmd: str, wait_for_resp: bool = True) -> None:
+        """
+        Sends a command to the serial device.
+        
+        Args:
+            cmd: The command string to send.
+            wait_for_resp: If True, waits 50ms to read and log the device response.
+        """
+        full_cmd = f"{cmd}\n"
+        self.ser.write(full_cmd.encode("utf-8"))
+        self.ser.flush()
+        
+        if not wait_for_resp:
+            logger.info("VHP CMD: %s", cmd)
+            return
+
+        # Small delay for the device to process response
+        time.sleep(0.05)
+        if self.ser.in_waiting:
+            resp = self.ser.read_all().decode("utf-8").strip()
+            logger.info("VHP CMD: %s -> %s", cmd, resp)
+        else:
+            logger.info("VHP CMD: %s", cmd)
 
     def is_connected(self) -> bool:
         """Checks if the device is responsive."""
@@ -62,22 +82,24 @@ class SerialCommunicator:
             return False
 
     def set_channel(self, channel: int) -> None:
-        self.send_command(f"c{channel}")
+        self.send_command(f"C{channel}")
 
     def set_volume(self, volume: int) -> None:
-        self.send_command(f"v{volume}")
+        self.send_command(f"V{volume}")
 
     def set_frequency(self, frequency: int) -> None:
-        self.send_command(f"f{frequency}")
+        self.send_command(f"F{frequency}")
 
     def start_stream(self) -> None:
-        self.send_command("on")
+        # Immediate return for timing precision
+        self.send_command("1", wait_for_resp=False)
 
     def stop_stream(self) -> None:
-        self.send_command("off")
+        # Immediate return for timing precision
+        self.send_command("0", wait_for_resp=False)
 
     def set_test_mode(self, enabled: bool) -> None:
-        self.send_command("test 1" if enabled else "test 0")
+        self.send_command(f"M{1 if enabled else 0}")
 
     def close(self) -> None:
         if hasattr(self, "ser") and self.ser.is_open:
@@ -211,15 +233,17 @@ class EEGSweep:
         
         b2_path = RAW_DATA_DIR / f"{self.timestamp}_{self.config.board_id}_baseline_NO_CONTACT.csv"
         
-        self.vhp.set_channel(p["Channel"]["Start"])
-        self.vhp.set_volume(p["Volume"]["Start"])
-        self.vhp.set_frequency(p["Frequency"]["Start"])
-        self.vhp.start_stream()
+        if self.vhp:
+            self.vhp.set_channel(p["Channel"]["Start"])
+            self.vhp.set_volume(p["Volume"]["Start"])
+            self.vhp.set_frequency(p["Frequency"]["Start"])
+            self.vhp.start_stream()
 
         with open(b2_path, "w", newline="") as f:
             writer = csv.writer(f)
             self.record_to_csv(float(p["Baselines"]["Baseline_2"]), writer, marker=31)
-            self.vhp.stop_stream()
+            if self.vhp:
+                self.vhp.stop_stream()
             self.record_to_csv(float(p["Baselines"]["Baseline_2"]), writer, marker=33)
         
         self.baseline_files.append(b2_path)
@@ -239,14 +263,17 @@ class EEGSweep:
         
         current_step = 0
         self.global_start_time = time.perf_counter()
-        self.vhp.set_test_mode(True)
+        
+        if self.vhp:
+            self.vhp.set_test_mode(True)
 
         for ch in range(ch_start, ch_end + 1, ch_step):
             for freq in range(freq_start, freq_end + 1, freq_step):
                 for vol in range(vol_start, vol_end + 1, vol_step):
-                    self.vhp.set_channel(ch)
-                    self.vhp.set_frequency(freq)
-                    self.vhp.set_volume(vol)
+                    if self.vhp:
+                        self.vhp.set_channel(ch)
+                        self.vhp.set_frequency(freq)
+                        self.vhp.set_volume(vol)
                     
                     filename = f"{self.config.board_id}_c{ch}_f{freq}_v{vol}.csv"
                     filepath = RAW_DATA_DIR / f"{self.timestamp}_{filename}"
@@ -256,15 +283,17 @@ class EEGSweep:
                         self.record_to_csv(p["Baselines"]["Baseline_3"], writer, marker=333)
                         
                         for _ in range(num_cycles):
-                            # Pre-Stim period
-                            self.record_to_csv(p["Measurements"]["Duration_on"], writer, marker=0)
+                            # Pre-Stim period (Rest)
+                            self.record_to_csv(p["Measurements"]["Duration_off"], writer, marker=0)
                             
                             # Stim ON
-                            self.vhp.start_stream()
+                            if self.vhp:
+                                self.vhp.start_stream()
                             self.record_to_csv(p["Measurements"]["Duration_on"], writer, marker=1)
-                            self.vhp.stop_stream()
+                            if self.vhp:
+                                self.vhp.stop_stream()
                             
-                            # Stim OFF
+                            # Stim OFF period (Post-stim rest)
                             self.record_to_csv(p["Measurements"]["Duration_off"], writer, marker=11)
                             
                             current_step += 1

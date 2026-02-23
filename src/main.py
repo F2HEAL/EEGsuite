@@ -9,15 +9,17 @@ if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
 from src.utils.logger import setup_logger
-from src.utils.paths import initialize_directories, CONFIG_DIR
+from src.utils.paths import initialize_directories, CONFIG_DIR, set_cloud_root
 from src.utils.config import EEGConfig
 
 def main():
     """Unified CLI for EEGsuite."""
-    initialize_directories()
-    logger = setup_logger()
-
     parser = argparse.ArgumentParser(description="F2H EEG Suite")
+    parser.add_argument(
+        "--data-root",
+        type=str,
+        help="Override the root directory for data, logs, and reports"
+    )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Server command
@@ -32,11 +34,23 @@ def main():
     # Analyze command
     analyze_parser = subparsers.add_parser("analyze", help="Analyze recorded data")
     analyze_parser.add_argument("-f", "--file", type=str, required=True, help="CSV file to analyze")
-    analyze_parser.add_argument("-s", "--start", type=float, default=7.5, help="Start time (sec)")
-    analyze_parser.add_argument("-d", "--duration", type=float, default=2.0, help="Duration (sec)")
+    analyze_parser.add_argument("-s", "--start", type=float, default=0.0, help="Start time (sec)")
+    analyze_parser.add_argument("-d", "--duration", type=float, default=60.0, help="Duration (sec)")
     analyze_parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
 
     args = parser.parse_args()
+
+    # Initialize paths and directories
+    if args.data_root:
+        set_cloud_root(Path(args.data_root))
+
+    try:
+        initialize_directories()
+    except Exception as e:
+        print(f"❌ Critical Error: Could not initialize data directories: {e}")
+        sys.exit(1)
+
+    logger = setup_logger()
 
     if args.command == "server":
         from src.streaming.server import LSLServer
@@ -58,29 +72,25 @@ def main():
         sweep.run_sweep()
 
     elif args.command == "analyze":
-        logger.info("Starting analysis for %s", args.file)
-        import subprocess
+        logger.info("Starting native analysis for %s", args.file)
+        from src.analysis.offline.visualizer import EEGVisualizer
+        from src.utils.paths import REPORT_DIR
         
-        # Path to your existing viz tool
-        viz_script = Path("D:/F2H_code/GH/eeg-tools/basic-visualization/src/viz1p_prep_html.py")
-        viz_config = Path("D:/F2H_code/GH/eeg-tools/basic-visualization/src/config-currystream.yaml")
+        # Load default analysis config
+        from src.utils.config import load_yaml
+        analysis_config_path = CONFIG_DIR / "analysis" / "default_offline.yaml"
+        config = load_yaml(analysis_config_path) if analysis_config_path.exists() else {}
         
-        if not viz_script.exists():
-            logger.error("Visualization script not found at %s", viz_script)
-            return
-
-        cmd = [
-            sys.executable, str(viz_script),
-            "-c", str(viz_config),
-            "-f", args.file,
-            "--start-time", str(args.start),
-            "--duration", str(args.duration)
-        ]
-        if args.verbose:
-            cmd.append("-v")
-            
-        logger.info("Running: %s", " ".join(cmd))
-        subprocess.run(cmd)
+        viz = EEGVisualizer(config)
+        viz.load_data(Path(args.file))
+        
+        report_path = viz.generate_report(
+            csv_file=Path(args.file),
+            output_dir=REPORT_DIR,
+            start=args.start,
+            duration=args.duration
+        )
+        logger.info("✅ Analysis complete. Report: %s", report_path)
 
     else:
         parser.print_help()
