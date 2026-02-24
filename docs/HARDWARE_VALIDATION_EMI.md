@@ -29,23 +29,33 @@ With the HW filter installed at the output of the Class D amplifier, the EM leak
 *   **Broadband Noise Floor**: $\approx 265\text{ dB}$ (**$35\text{ dB}$ reduction**)
 *   **Observations**: The signal is significantly cleaner. The reduction in variance indicates a much more deterministic and stable EM environment.
 
+### 3. Benchmark: Medical-Grade Dual-Coil VCA
+To establish a "gold standard," a medical-grade VCA with a balanced dual-coil design was measured under the same conditions.
+
+![EMI Medical Grade](assets/emi_medical_grade.png)
+
+*   **Peak Power (32 Hz)**: **None detected**. The dual-coil design provides perfect electromagnetic cancellation at the source.
+*   **Broadband Noise Floor**: $\approx 265\text{ dB}$.
+*   **Observations**: The 32 Hz EM signature is completely absent. The dominant feature is now the 50 Hz mains peak, which was previously masked by the Class D noise.
+
 ---
 
 ## 🔬 Quantitative Findings
 
-| Metric | No Filter | With HW Filter | Improvement |
+| Metric | No Filter | With HW Filter | Medical-Grade |
 | :--- | :--- | :--- | :--- |
-| **Stimulus Peak (32 Hz)** | $325\text{ dB}$ | $285\text{ dB}$ | **$-40\text{ dB}$** |
-| **System Noise Floor** | $300\text{ dB}$ | $265\text{ dB}$ | **$-35\text{ dB}$** |
-| **Power Reduction** | Baseline | $1/3162$ of original | **$>3,000\times$ quieter** |
+| **Stimulus Peak (32 Hz)** | $325\text{ dB}$ | $285\text{ dB}$ | **Not Detected** |
+| **System Noise Floor** | $300\text{ dB}$ | $265\text{ dB}$ | **$265\text{ dB}$** |
+| **Noise Reduction** | Baseline | $-35\text{ dB}$ | **$-35\text{ dB}$** |
 
 ---
 
 ## 💡 Qualitative Interpretation
 
-1.  **Class D Carrier Cleanup**: The 35 dB drop in the noise floor indicates that the filter is successfully trapping high-frequency PWM harmonics before they can radiate into the EEG leads.
-2.  **Increased Dynamic Range**: By lowering the floor, the system has "unmasked" the rest of the spectrum. For example, the **50 Hz mains peak** is now clearly visible in the filtered plot, whereas it was completely buried under the amplifier's noise in the unfiltered setup.
-3.  **Deterministic Stability**: The tighter variance in the filtered data suggests the EMI is now stable and predictable, which makes it much easier to handle in software if any residual interference remains.
+1.  **Filter vs. Source Cancellation**: While the Custom HW Filter suppresses the interference by 40 dB, the Medical-Grade VCA eliminates it at the source via its dual-coil architecture.
+2.  **Achieving the System Floor**: The fact that both the filtered setup and the medical-grade device share an identical **265 dB noise floor** indicates that we have reached the hardware resolution limit of the EEG acquisition system.
+3.  **Class D Carrier Cleanup**: The 35 dB drop in the noise floor confirms that the custom filter effectively matches medical-grade performance in stripping away Class D amplifier switching noise.
+4.  **Mains Visibility**: In both the filtered and medical-grade setups, the 50 Hz mains peak becomes the new dominant interference, as the broadband "dirt" from the stimulator has been successfully removed.
 
 ## 🎯 Conclusion
-The hardware filter is **exceptionally effective**. It provides a power reduction of more than 3,000 times in the background EM noise floor. This level of isolation is critical for ensuring that future EEG measurements reflect actual brain activity rather than stimulator interference.
+The custom hardware filter successfully brings a standard stimulator down to **medical-grade electromagnetic performance** regarding the broadband noise floor. While the medical-grade dual-coil VCA is superior for its inherent cancellation of the 32 Hz stimulus peak, the filtered setup is now sufficiently quiet for high-integrity Parkinson's research measurements.
