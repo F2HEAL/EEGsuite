@@ -11,6 +11,17 @@ The suite consists of three primary layers:
 2.  **Protocol & Recording (`sweep`)**: Connects to the LSL stream and an external stimulator (VHP device) to run automated experimental protocols.
 3.  **Visualization & Analysis (`analyze`)**: Processes recorded CSV/EDF files to generate research-ready plots and metrics.
 
+### 🔌 Hardware Connection Schematic
+
+![System Architecture](assets/system_schematic.png)
+*Note: Ensure USB Isolators are used as shown to maintain signal integrity.*
+
+The hardware setup is designed for maximum signal purity and participant safety:
+
+*   **Acquisition Node (Left)**: The FreeEEG32 is battery-powered (3x1.5V AA) and connected via a USB Isolator. The acquisition laptop should ideally run on DC power (battery) to eliminate 50/60Hz mains interference.
+*   **Control Node (Center)**: The Master laptop manages the protocol and stimulation. It communicates with the acquisition node via a local Ethernet switch for low-latency LSL streaming.
+*   **Vibrotactile Stimulator (Right)**: A voice-coil based actuator delivering precise tactile stimuli. It is electrically isolated from the EEG acquisition branch to prevent electromagnetic leakage.
+
 ---
 
 ## 🚀 Quick Start
