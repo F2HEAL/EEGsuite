@@ -16,6 +16,9 @@ The suite consists of three primary layers:
 ![System Architecture](assets/system_schematic.png)
 *Note: Ensure USB Isolators are used as shown to maintain signal integrity.*
 
+For specific electrode placement used in the KULLAB measurements, see the [KULLAB 32 Montage Documentation](MONTAGE_KULLAB.md).
+For the 8-channel motor cortex montage, see the [FREG8 Montage Documentation](MONTAGE_FREG8.md).
+
 The hardware setup is designed for maximum signal purity and participant safety:
 
 *   **Acquisition Node (Left)**: The FreeEEG32 is battery-powered (3x1.5V AA) and connected via a USB Isolator. The acquisition laptop should ideally run on DC power (battery) to eliminate 50/60Hz mains interference.
@@ -60,9 +63,12 @@ Runs the automated protocol, controlling both EEG recording and the VHP stimulat
 
 ### `analyze` (The Data Visualizer)
 Generates native HTML visualizations of your recorded data using MNE-python.
-*   **Usage**: `python -m src.main analyze -f .\data\session_01.csv -s 7.5 -d 2.0`
+*   **Usage**: `python -m src.main analyze -f .\data\session_01.csv -s 0.0 -d 60.0`
 *   **Action**: Look for the report in the `\reports` folder.
 *   **Customization**: Edit `config\analysis\default_offline.yaml` to change channel names, montage, or filter frequencies.
+*   **Montage Switching**: To change electrode layouts (e.g., from 32-channel to 8-channel), change the `montage_profile` in `config\analysis\default_offline.yaml`.
+    *   `kullab`: Standard 32-channel layout.
+    *   `freg8`: Sparse 8-channel motor layout.
 *   **Options**:
     *   `-f, --file`: Path to the CSV file.
     *   `-s, --start`: Start time in seconds (default: 0.0).

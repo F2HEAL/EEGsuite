@@ -96,8 +96,43 @@ class EEGVisualizer:
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
+        self._load_montage_profile()
         self.sfreq = 0.0
         self.raw = None
+
+    def _load_montage_profile(self):
+        """Loads specific montage configuration if profile is set."""
+        profile = self.config.get('montage_profile')
+        if not profile:
+            return
+
+        # Look in config/montages first
+        montage_dir = Path(__file__).resolve().parent.parent.parent.parent / "config" / "montages"
+        profile_path = montage_dir / f"{profile}.yaml"
+        
+        if not profile_path.exists():
+            # Check if user provided a direct path
+            profile_path = Path(profile)
+        
+        if profile_path.exists():
+            try:
+                import yaml
+                with open(profile_path, 'r') as f:
+                    m_config = yaml.safe_load(f)
+                    # Override channels and montage
+                    if 'channels' in m_config:
+                        self.config['channels'] = m_config['channels']
+                        logger.info("Loaded channel map from %s", profile_path.name)
+                    if 'montage' in m_config:
+                        self.config['montage'] = m_config['montage']
+                    # Apply specific picks if defined (like for FREG8)
+                    if 'pick_channels' in m_config:
+                        self.config['pick_channels'] = m_config['pick_channels']
+                        logger.info("Auto-picking channels from profile: %s", m_config['pick_channels'])
+            except Exception as e:
+                logger.error("Failed to load montage profile %s: %s", profile, e)
+        else:
+            logger.warning("Montage profile '%s' not found at %s", profile, profile_path)
 
     def load_data(self, csv_file: Path):
         """Loads CSV data and creates MNE object."""
@@ -121,6 +156,21 @@ class EEGVisualizer:
         info = mne.create_info(ch_names=ch_names, sfreq=self.sfreq, ch_types='eeg')
         self.raw = mne.io.RawArray(eeg_data, info)
         
+        # Drop 'NC' channels if present
+        if 'NC' in self.raw.ch_names:
+            self.raw.drop_channels(['NC'], on_missing='ignore')
+            logger.info("Dropped unconnected channels (NC)")
+        
+        # Set montage if specified in config
+        montage_name = self.config.get('montage')
+        if montage_name:
+            try:
+                montage = mne.channels.make_standard_montage(montage_name)
+                self.raw.set_montage(montage, on_missing='warn')
+                logger.info("Applied montage: %s", montage_name)
+            except Exception as e:
+                logger.warning("Could not apply montage %s: %s", montage_name, e)
+
         # Add annotations
         self._add_annotations(timestamps, markers)
 
@@ -248,6 +298,75 @@ class EEGVisualizer:
             logger.error("Error creating ERP plot for %s: %s", event_type, e)
             return None
 
+    def create_joint_erp_plot(self, event_type: str = 'Stimulation ON [1]'):
+        """Create a joint plot (butterfly + topomaps) as shown in MNE tutorials."""
+        if not self.raw.annotations:
+            return None
+        events, event_id = mne.events_from_annotations(self.raw)
+        if event_type not in event_id:
+            return None
+            
+        tmax = self.config.get('erp_duration', 1.0)
+        try:
+            epochs = mne.Epochs(self.raw, events, event_id=event_id[event_type],
+                               tmin=-0.2, tmax=tmax, baseline=(-0.2, 0),
+                               preload=True, verbose=False)
+            evoked = epochs.average()
+            
+            # plot_joint shows butterfly plot + topomaps at peak latencies
+            fig = evoked.plot_joint(show=False, title=f'Joint ERP Analysis: {event_type}')
+            return fig
+        except Exception as e:
+            logger.error("Error creating Joint ERP plot: %s", e)
+            return None
+
+    def create_erp_image_plot(self, event_type: str = 'Stimulation ON [1]'):
+        """Create an ERP image (heatmap across trials)."""
+        if not self.raw.annotations:
+            return None
+        events, event_id = mne.events_from_annotations(self.raw)
+        if event_type not in event_id:
+            return None
+            
+        tmax = self.config.get('erp_duration', 1.0)
+        try:
+            epochs = mne.Epochs(self.raw, events, event_id=event_id[event_type],
+                               tmin=-0.2, tmax=tmax, baseline=(-0.2, 0),
+                               preload=True, verbose=False)
+            # Plot the first channel in the picked list as an image across trials
+            fig = epochs.plot_image(picks=[0], show=False, 
+                                   title=f'ERP Image: {event_type} (Ch: {epochs.ch_names[0]})')[0]
+            return fig
+        except Exception as e:
+            logger.error("Error creating ERP Image plot: %s", e)
+            return None
+
+    def create_epoch_psd_plot(self, event_type: str = 'Stimulation ON [1]'):
+        """Create PSD plot averaged across all epochs of a specific event type."""
+        if not self.raw.annotations:
+            return None
+        
+        events, event_id = mne.events_from_annotations(self.raw)
+        if event_type not in event_id:
+            return None
+            
+        tmax = self.config.get('erp_duration', 1.0)
+        try:
+            epochs = mne.Epochs(self.raw, events, event_id=event_id[event_type],
+                               tmin=0, tmax=tmax, baseline=None,
+                               preload=True, verbose=False)
+            if len(epochs) == 0:
+                return None
+                
+            # Compute PSD for the epochs
+            psd = epochs.compute_psd(fmin=1.0, fmax=60.0, method='welch')
+            fig = psd.plot(average=True, show=False)
+            fig.axes[0].set_title(f'Epoch PSD: {event_type} (n={len(epochs)})')
+            return fig
+        except Exception as e:
+            logger.error("Error creating Epoch PSD plot for %s: %s", event_type, e)
+            return None
+
     def create_frequency_band_plot(self, band_name: str, fmin: float, fmax: float):
         """Create plot for specific frequency band."""
         try:
@@ -330,8 +449,25 @@ class EEGVisualizer:
         # 4. ERP section
         fig_erp = self.create_erp_plot('Stimulation ON [1]')
         if fig_erp:
-            report.add_section("Event-Related Potential (ERP)", plot=fig_erp,
-                              plot_caption="ERP for Stimulation ON [1] events")
+            report.add_section("Event-Related Potential (ERP) - Butterfly", plot=fig_erp,
+                              plot_caption="Butterfly plot of averaged response across trials.")
+
+        # 4a. Advanced MNE Evoked Visualizations
+        fig_joint = self.create_joint_erp_plot('Stimulation ON [1]')
+        if fig_joint:
+            report.add_section("ERP Joint Plot (Topomaps)", plot=fig_joint,
+                              plot_caption="Advanced MNE Joint Plot: Combines the butterfly plot with spatial topomaps at peak activity latencies.")
+
+        fig_image = self.create_erp_image_plot('Stimulation ON [1]')
+        if fig_image:
+            report.add_section("ERP Image (Trial Heatmap)", plot=fig_image,
+                              plot_caption="ERP Image: Shows the amplitude of each individual trial as a heatmap, allowing you to see the consistency of the response across the entire recording.")
+
+        # 4b. Epoch PSD section (Frequency domain of the stimulation segments)
+        fig_epsd = self.create_epoch_psd_plot('Stimulation ON [1]')
+        if fig_epsd:
+            report.add_section("Epoch-Averaged PSD", plot=fig_epsd,
+                              plot_caption="Power Spectrum specifically for the Stimulation ON epochs (n=x)")
             
         # 5. Stimulation Comparison
         fig_comp = self.create_stim_comparison_plot()

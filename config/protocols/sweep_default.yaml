@@ -19,6 +19,6 @@ Baselines:
   Baseline_3: 5
 
 Measurements:
-  Number: 2
+  Number: 10
   Duration_on: 1
   Duration_off: 0.5

@@ -1,0 +1,26 @@
+# FREG8 8-Channel Montage
+# Mapping specific FreeEEG32 inputs to 10-20 locations
+# Unused channels are marked as 'NC' (Not Connected)
+name: FREG8
+montage: standard_1020
+channels: [
+    T7,   # CH1
+    C3,   # CH2
+    NC,   # CH3
+    NC,   # CH4
+    T8,   # CH5
+    FC4,  # CH6
+    NC,   # CH7
+    NC,   # CH8
+    FC3,  # CH9
+    C4,   # CH10
+    NC,   # CH11
+    NC,   # CH12
+    CP3,  # CH13
+    CP4,  # CH14
+    NC, NC, NC, NC, NC, NC, 
+    NC, NC, NC, NC, NC, NC, 
+    NC, NC, NC, NC, NC, NC
+]
+# Automatically pick only the valid channels for analysis
+pick_channels: [T7, C3, T8, FC4, FC3, C4, CP3, CP4]

@@ -1,14 +1,22 @@
 # EEG Analysis Configuration
 # ---------------------------
 
-# Channel Mapping for FreeEEG32 (standard 10-20 system if applicable)
-channels: [
-    Iz, PO9, PO10, O1, O2, P7, P3, Pz,
-    P4, P8,  TP9,  TP10, CP5, CP1, CP2, CP6,
-    T7, T8, C3, Cz, C4, FC5, FC1, FC2,
-    FC6, FT9, FT10, F7, F3, Fz, F4, F8, ]
+# Active Montage Profile
+# Options: "kullab", "freg8", or path to custom YAML
+montage_profile: kullab
 
-montage: easycap-M1
+# Channel Mapping (Fallback if profile not found)
+channels: [
+    F7, F3, Fz, F4, F8,
+    FC5, FC1, FC2, FC6,
+    FT9, T7, C3, Cz, C4, T8, FT10,
+    CP5, CP1, CP2, CP6,
+    TP9, P7, P3, Pz, P4, P8, TP10,
+    O1, PO9, PO10, O2,
+    Iz
+]
+
+montage: standard_1020 # Standard labels allow MNE to find 3D coordinates
 
 # Filtering settings
 fmin: 1.5
@@ -20,7 +28,7 @@ default_start_time: 0.0
 default_duration: 10.0
 psd_fmin: 1.0
 psd_fmax: 60.0
-pick_channels: [Iz]               # Channels to show in the entire report
+pick_channels: [Iz, PO9, PO10, O1]               # Channels to show in the entire report
 
 # ERP settings
 erp_duration: 1.1                 # Length of ERP window in seconds
