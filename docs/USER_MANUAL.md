@@ -96,6 +96,9 @@ Generates native HTML visualizations of your recorded data using MNE-python.
 
 This suite is optimized for high-precision academic research. Based on empirical validation:
 
+*   **Timing Accuracy**: See findings in the [Performance Section](#performance--timing-precision).
+*   **EM Integrity**: For detailed measurements on stimulator cross-talk and filter effectiveness, see the [Hardware Validation Report](HARDWARE_VALIDATION_EMI.md).
+
 ### 1. Synchronization Accuracy
 *   **Mean Latency**: $\approx 6.0\text{ms}$ (Command to physical vibration).
 *   **Marker Precision**: Event markers are synchronized with EEG data at a resolution of **1.95ms** (at 512 Hz sampling).
