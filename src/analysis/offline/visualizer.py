@@ -126,7 +126,8 @@ class EEGVisualizer:
                     if 'montage' in m_config:
                         self.config['montage'] = m_config['montage']
                     # Apply specific picks if defined (like for FREG8)
-                    if 'pick_channels' in m_config:
+                    # BUT: Only if the user hasn't already specified a manual pick in the main config
+                    if 'pick_channels' in m_config and not self.config.get('manual_pick_override'):
                         self.config['pick_channels'] = m_config['pick_channels']
                         logger.info("Auto-picking channels from profile: %s", m_config['pick_channels'])
             except Exception as e:
@@ -277,10 +278,10 @@ class EEGVisualizer:
                                preload=True, verbose=True,
                                on_missing='warning')
             
-            # Log why epochs were dropped
+            # Log why epochs were dropped (filter out 'IGNORED' which is normal)
             if len(epochs.drop_log) > 0:
                 for i, log in enumerate(epochs.drop_log):
-                    if log:
+                    if log and 'IGNORED' not in log:
                         logger.warning("Epoch %d dropped because: %s", i, log)
 
             logger.info("Created %d epochs for '%s'.", len(epochs), event_type)
@@ -367,12 +368,94 @@ class EEGVisualizer:
             logger.error("Error creating Epoch PSD plot for %s: %s", event_type, e)
             return None
 
+    def create_spectrogram_plot(self, channel_name: str, fmin: float = 20.0, fmax: float = 60.0):
+        """Create a Morlet wavelet spectrogram for a specific channel."""
+        logger.info("Generating spectrogram for %s...", channel_name)
+        try:
+            # Memory optimization: decimate to ~100Hz
+            decim = max(1, int(self.raw.info['sfreq'] / 100))
+            freqs = np.arange(fmin, fmax, 1.0) # 1Hz steps
+            n_cycles = freqs / 2.0  # variable cycles
+            
+            # Filter copy of data first
+            raw_filtered = self.raw.copy().filter(fmin, fmax, verbose=False)
+            
+            power = raw_filtered.compute_tfr(
+                method="morlet",
+                freqs=freqs,
+                n_cycles=n_cycles,
+                picks=[channel_name],
+                decim=decim,
+                n_jobs=1,
+                verbose=False
+            )
+            
+            fig, ax = plt.subplots(figsize=(12, 5))
+            # Handle different MNE versions returning AverageTFR or EpochsTFR
+            if hasattr(power, 'plot'):
+                power.plot([0], baseline=None, mode='logratio', axes=ax, show=False, colorbar=True)
+            else:
+                # If it returns an array or something else
+                logger.warning("compute_tfr returned unexpected type: %s", type(power))
+                return None
+                
+            ax.set_title(f'Spectrogram: {channel_name} ({fmin}-{fmax} Hz)')
+            return fig
+        except Exception as e:
+            logger.error("Error creating spectrogram for %s: %s", channel_name, e)
+            return None
+
+    def get_channel_quality_report(self):
+        """Analyze channel quality (bad channels, variance)."""
+        # Placeholder for more advanced PyPrep integration if desired
+        # For now, we report basic stats
+        quality_info = {
+            "Total Channels": len(self.raw.ch_names),
+            "Sampling Rate": self.sfreq,
+            "Duration": self.raw.times[-1],
+            "Bad Channels (marked)": self.raw.info['bads'],
+        }
+        
+        # Calculate variance per channel to identify flat/noisy ones
+        data = self.raw.get_data()
+        variances = np.var(data, axis=1)
+        
+        # Identify potentially bad channels based on variance thresholds (heuristic)
+        median_var = np.median(variances)
+        flat_channels = [self.raw.ch_names[i] for i, v in enumerate(variances) if v < median_var * 0.01]
+        noisy_channels = [self.raw.ch_names[i] for i, v in enumerate(variances) if v > median_var * 100]
+        
+        quality_info["Potentially Flat Channels"] = flat_channels
+        quality_info["Potentially Noisy Channels"] = noisy_channels
+        
+        return quality_info
+
     def create_frequency_band_plot(self, band_name: str, fmin: float, fmax: float):
-        """Create plot for specific frequency band."""
+        """Create plot for specific frequency band with colors and legend."""
         try:
             psd = self.raw.compute_psd(fmin=fmin, fmax=fmax, method='welch')
-            fig = psd.plot(average=False, show=False, spatial_colors=False)
-            fig.axes[0].set_title(f'{band_name} ({fmin}-{fmax} Hz) Power by Channel')
+            
+            # Create a custom figure to have better control over colors/legend
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            # Get data and frequencies
+            data = psd.get_data() # shape (n_channels, n_freqs)
+            freqs = psd.freqs
+            
+            # Plot each channel with a unique color from a standard map
+            colors = plt.cm.tab10(np.linspace(0, 1, len(self.raw.ch_names)))
+            
+            for i, ch_name in enumerate(self.raw.ch_names):
+                # Convert to dB for consistent scaling
+                psd_db = 10 * np.log10(data[i])
+                ax.plot(freqs, psd_db, label=ch_name, color=colors[i], lw=1.5)
+            
+            ax.set_title(f'{band_name} ({fmin}-{fmax} Hz) Power Spectrum')
+            ax.set_xlabel('Frequency (Hz)')
+            ax.set_ylabel('Power (dB)')
+            ax.legend(loc='upper right', fontsize='small', ncol=2 if len(self.raw.ch_names) > 5 else 1)
+            ax.grid(True, alpha=0.3)
+            
             return fig
         except Exception as e:
             logger.error("Error creating %s plot: %s", band_name, e)
@@ -435,24 +518,35 @@ class EEGVisualizer:
         }
         report.add_section("File Information", content=info)
         
-        # 2. Timeseries section
+        # 2. Channel Quality
+        quality = self.get_channel_quality_report()
+        report.add_section("Channel Quality Assessment", content=quality)
+
+        # 3. Timeseries section
         fig_ts = self.create_timeseries_plot(start, duration)
         report.add_section("Timeseries Analysis", plot=fig_ts, 
                           plot_caption=f"Segment from {start}s with {duration}s duration")
         
-        # 3. PSD section
+        # 4. Spectrograms per Channel (for selected channels)
+        for ch in self.raw.ch_names:
+            fig_spec = self.create_spectrogram_plot(ch)
+            if fig_spec:
+                report.add_section(f"Spectrogram: {ch}", plot=fig_spec,
+                                  plot_caption=f"Time-Frequency analysis for {ch} (20-60Hz)")
+
+        # 5. PSD section
         fig_psd = self.create_psd_plot()
         if fig_psd:
             report.add_section("Power Spectral Density", plot=fig_psd,
                               plot_caption="Average power spectral density across all channels")
             
-        # 4. ERP section
+        # 6. ERP section
         fig_erp = self.create_erp_plot('Stimulation ON [1]')
         if fig_erp:
             report.add_section("Event-Related Potential (ERP) - Butterfly", plot=fig_erp,
                               plot_caption="Butterfly plot of averaged response across trials.")
 
-        # 4a. Advanced MNE Evoked Visualizations
+        # 7. Advanced MNE Evoked Visualizations
         fig_joint = self.create_joint_erp_plot('Stimulation ON [1]')
         if fig_joint:
             report.add_section("ERP Joint Plot (Topomaps)", plot=fig_joint,
@@ -463,19 +557,19 @@ class EEGVisualizer:
             report.add_section("ERP Image (Trial Heatmap)", plot=fig_image,
                               plot_caption="ERP Image: Shows the amplitude of each individual trial as a heatmap, allowing you to see the consistency of the response across the entire recording.")
 
-        # 4b. Epoch PSD section (Frequency domain of the stimulation segments)
+        # 8. Epoch PSD section (Frequency domain of the stimulation segments)
         fig_epsd = self.create_epoch_psd_plot('Stimulation ON [1]')
         if fig_epsd:
             report.add_section("Epoch-Averaged PSD", plot=fig_epsd,
                               plot_caption="Power Spectrum specifically for the Stimulation ON epochs (n=x)")
             
-        # 5. Stimulation Comparison
+        # 9. Stimulation Comparison
         fig_comp = self.create_stim_comparison_plot()
         if fig_comp:
             report.add_section("Stimulation vs Baseline", plot=fig_comp,
                               plot_caption="Comparison of PSD: Stimulation ON (Green) vs Baseline (Gray)")
             
-        # 6. Frequency Bands
+        # 10. Frequency Bands
         freq_bands = {
             'Alpha (8-13 Hz)': (8, 13),
             'Beta (13-30 Hz)': (13, 30),

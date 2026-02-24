@@ -81,6 +81,10 @@ def main():
         analysis_config_path = CONFIG_DIR / "analysis" / "default_offline.yaml"
         config = load_yaml(analysis_config_path) if analysis_config_path.exists() else {}
         
+        # Check if user manually specified channels in the YAML
+        if config.get('pick_channels'):
+            config['manual_pick_override'] = True
+        
         viz = EEGVisualizer(config)
         viz.load_data(Path(args.file))
         

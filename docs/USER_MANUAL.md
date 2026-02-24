@@ -69,6 +69,9 @@ Generates native HTML visualizations of your recorded data using MNE-python.
 *   **Montage Switching**: To change electrode layouts (e.g., from 32-channel to 8-channel), change the `montage_profile` in `config\analysis\default_offline.yaml`.
     *   `kullab`: Standard 32-channel layout.
     *   `freg8`: Sparse 8-channel motor layout.
+*   **Channel Picking**: You can manually override which channels appear in the report by editing the `pick_channels` list in `config\analysis\default_offline.yaml`.
+    *   If `pick_channels` is defined in the main YAML, it takes priority over the montage profile's defaults.
+    *   This affects all plots: Timeseries, Spectrograms, PSD, and ERPs.
 *   **Options**:
     *   `-f, --file`: Path to the CSV file.
     *   `-s, --start`: Start time in seconds (default: 0.0).
