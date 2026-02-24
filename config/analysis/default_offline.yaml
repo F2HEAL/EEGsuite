@@ -3,7 +3,7 @@
 
 # Active Montage Profile
 # Options: "kullab", "freg8", or path to custom YAML
-montage_profile: kullab
+montage_profile: freg8
 
 # Channel Mapping (Fallback if profile not found)
 channels: [
@@ -28,7 +28,7 @@ default_start_time: 0.0
 default_duration: 10.0
 psd_fmin: 1.0
 psd_fmax: 60.0
-pick_channels: [Iz, PO9, PO10, O1]               # Channels to show in the entire report
+pick_channels: [T7, C3, T8, FC4]               # Channels to show in the entire report [Iz, PO9, PO10, O1]
 
 # ERP settings
 erp_duration: 1.1                 # Length of ERP window in seconds
