@@ -1,4 +1,4 @@
-# EEG Software Suite
+# F2H VBS EEG Software Suite
 Modular EEG platform for high-portability research.
 
 ## 🛠 Software Parts
