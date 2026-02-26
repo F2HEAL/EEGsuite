@@ -1,0 +1,74 @@
+{
+  "presets": [
+    {
+      "name": "8-40",
+      "8_channels": true,
+      "samplerate_hz": 46875,
+      "stimulation_frequency_hz": 40,
+      "stimulation_duration_ms": 200,
+      "cycle_period_duration_ms": 2240,
+      "number_of_cycles_in_pauze_cycle": 5,
+      "number_of_cycles_in_pauze_cycle_to_pauze": 2,
+      "jitter_on_timing_permill": 235,
+      "volume_percent": 75.0,
+      "testmode" : false,
+      "single_channel" : 0
+    },
+    {
+      "name": "8-250",
+      "8_channels": true,
+      "samplerate_hz": 46875,
+      "stimulation_frequency_hz": 250,
+      "stimulation_duration_ms": 100,
+      "cycle_period_duration_ms": 1332,
+      "number_of_cycles_in_pauze_cycle": 5,
+      "number_of_cycles_in_pauze_cycle_to_pauze": 2,
+      "jitter_on_timing_permill": 235,
+      "volume_percent": 7.0,
+      "testmode" : false,
+      "single_channel" : 0
+    },
+    {
+      "name": "4-40",
+      "8_channels": false,
+      "samplerate_hz": 46875,
+      "stimulation_frequency_hz": 40,
+      "stimulation_duration_ms": 200,
+      "cycle_period_duration_ms": 1120,
+      "number_of_cycles_in_pauze_cycle": 5,
+      "number_of_cycles_in_pauze_cycle_to_pauze": 2,
+      "jitter_on_timing_permill": 235,
+      "volume_percent": 75.0,
+      "testmode" : false,
+      "single_channel" : 0
+    },
+    {
+      "name": "4-250",
+      "8_channels": false,
+      "samplerate_hz": 46875,
+      "stimulation_frequency_hz": 250,
+      "stimulation_duration_ms": 100,
+      "cycle_period_duration_ms": 666,
+      "number_of_cycles_in_pauze_cycle": 5,
+      "number_of_cycles_in_pauze_cycle_to_pauze": 2,
+      "jitter_on_timing_permill": 235,
+      "volume_percent": 7.0,
+      "testmode" : false,
+      "single_channel" : 0
+    },
+    {
+      "name": "999 (only for development!)",
+      "8_channels": true,
+      "samplerate_hz": 46875,
+      "stimulation_frequency_hz": 40,
+      "stimulation_duration_ms": 8000,
+      "cycle_period_duration_ms": 64000,
+      "number_of_cycles_in_pauze_cycle": 1,
+      "number_of_cycles_in_pauze_cycle_to_pauze": 0,
+      "jitter_on_timing_permill": 0,
+      "volume_percent": 100.0,
+      "testmode" : true,
+      "single_channel" : 1
+    }
+  ]
+}

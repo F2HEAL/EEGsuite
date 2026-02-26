@@ -1,0 +1,10 @@
+pg@bmax:/var/www/html$ sudo mkdir webui23
+[sudo] password for pg:
+pg@bmax:/var/www/html$ ls
+index.html  webui  webui21  webui22  webui23
+pg@bmax:/var/www/html$ sudo chown -R pg:www-data /var/www/html/webui23
+pg@bmax:/var/www/html$ sudo chmod -R 775 /var/www/html/webui23
+
+
+
+PS K:\My Drive\VHP F2HEAL TEAM\20_code\VBS_WEBUI\webui23> scp .\f2heal_webui.html pg@192.168.155.252:/var/www/html/webui23

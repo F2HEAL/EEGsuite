@@ -1,3 +1,6 @@
+Open folder D:\F2H_code\GH\EEGsuite in VCS and in FE                
+Open in FE G:\My Drive\SharedData\
+
 
 Decide on which PC to connect the EEG device a to activate the LSL stream. Can be different PC than the VBS PC.
 

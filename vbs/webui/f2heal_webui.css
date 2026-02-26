@@ -1,0 +1,169 @@
+/* General Layout and Typography */
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    margin: 10px;
+    font-size: 16px; /* Larger base font for mobile */
+  }
+
+  .container-fluid > header h1 {
+    font-size: 1.5rem;
+    padding: 10px 0;
+  }
+  
+  .container-fluid > header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .container-fluid > section h2 {
+    font-size: 1.1rem;
+  }
+
+  button {
+    font-size: 1.1rem;
+    padding: 10px 20px;
+    margin: 5px;
+    border-radius: 8px;
+  }
+  
+  fieldset {
+    padding: 10px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+  }
+  
+  legend {
+    font-size: 1.3rem;
+    width: auto;
+    padding: 0 10px;
+    font-weight: bold;
+  }
+
+  input[type="text"], input[type="number"], select {
+    font-size: 1.1rem;
+    padding: 10px;
+    margin: 8px 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .hidden-section {
+    display: none;
+    margin-top: 20px;
+  }
+  
+  .mapping {
+    margin-bottom: 30px;
+    overflow-x: auto; /* Allow table scrolling on small screens */
+  }
+  
+  .title {
+    font-weight: bold;
+    margin-bottom: 10px;
+    text-align: center;
+    font-size: 1.2rem;
+  }
+  
+  /* Tables */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    background-color: white;
+  }
+  
+  th, td {
+    border: 1px solid #dee2e6;
+    padding: 12px 8px;
+    text-align: center;
+  }
+  
+  th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+  }
+  
+  /* Cable Color Classes - Restoring Colored Layout */
+  .cable {
+    font-weight: bold;
+    background-color: #e9ecef;
+  }
+  
+  .color-blue { background-color: #007bff; color: white; font-weight: bold; }
+  .color-brown { background-color: #795548; color: white; font-weight: bold; }
+  .color-orange { background-color: #fd7e14; color: white; font-weight: bold; }
+  .color-green { background-color: #28a745; color: white; font-weight: bold; }
+  
+  /* Control & Layout Specific Styles */
+  .channelTest {
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  #clientConnectButton {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  #connectionPanel {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  #deviceName {
+    font-family: monospace;
+    font-size: 125%;
+    float: left;
+  }
+  
+  .knobLabel {
+    margin-right: 0.8em;
+  }
+  
+  .knobTextValue {
+    width: 3.5em;
+    text-align: right;
+    font-family: monospace;
+  }
+  
+  #logDisplay {
+    color: #eee;
+    background-color: #222;
+    resize: none;
+  }
+  
+  #OtaBootloadMode {
+    float: left;
+    font-size: 110%;
+    margin-left: 2em;
+    background-color: #ea5;
+  }
+  
+  /* Panels */
+  .panel {
+    width: 100%;
+    max-width: 26em;
+    border: 1px solid #bbb;
+    margin: 0 0 15px 0;
+    padding: 1em;
+    border-radius: 8px;
+  }
+  
+  .panel button {
+    padding: 4pt;
+    margin-right: 0.3em;
+  }
+  
+  .panel legend {
+    font-size: 120%;
+  }
+  
+  .panel table {
+    margin-top: 1.5ex;
+  }
+  
+  .panel-clear {
+    clear: both;
+  }
+  
