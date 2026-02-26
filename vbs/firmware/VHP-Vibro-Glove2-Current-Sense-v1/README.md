@@ -7,9 +7,9 @@ This is a specialized firmware branch for the **VHP (Vibro-Tactile Haptics Platf
 1.  **Based on Stable Core**: Built upon the `SERCOM_2_0_2_BETA` foundation, ensuring reliable volume control and parameter handling.
 2.  **Synchronized Current Sensing**: 
     *   Implements intelligent ADC sampling synchronized with the PWM cycle.
-    *   **Noise Rejection**: Samples are taken 300µs after the PWM rising edge to avoid switching transients.
+    *   **High-Speed Sampling**: Samples are taken at the full PWM sequence rate (~5.86 kHz) to capture the AC current waveform.
     *   **Mux Protection**: Multiplexer channel switching occurs exclusively during the PWM OFF period to prevent arcing and settle-time artifacts.
-3.  **Data Logging**: Uses a high-speed ring buffer (`DLog`) to store up to 50,000 current samples (1 second at 50kHz equivalent).
+3.  **Data Logging**: Uses a high-speed ring buffer (`DLog`) to store up to **100,000 current samples** (~17 seconds at 5.86kHz).
 
 ## 🔌 Hardware Configuration
 
@@ -38,23 +38,24 @@ In addition to the standard VHP commands (`1`, `0`, `V{n}`, `F{n}`, etc.), this 
 
 | Feature | Details |
 | :--- | :--- |
-| **Columns** | `SampleIndex` (pulse count), `Current(A)` (measured load in Amps) |
-| **Timewise Resolution** | **1 sample per stimulation pulse**. The sampling rate matches your `stimfreq` (e.g., at 32Hz, you get 32 samples/sec). |
-| **Channel Mapping** | Logs the **currently active channel**. In a sweep protocol, the log is a continuous stream matching the stimulation sequence. |
-| **Measurement Sync** | Sampled **300µs after the pulse start** to capture stable steady-state current after inductive transients. |
-| **Filtering** | Uses a **90/10 moving average** to filter out Class D switching noise. |
-| **Max Capacity** | **50,000 samples** (~26 minutes at 32Hz). |
+| **Columns** | `SampleIndex`, `Current(A)` |
+| **Sample Rate** | **~5,859 Hz** (Samples every PWM sequence completion). |
+| **Waveform Capture** | Provides ~183 samples per cycle for a 32Hz sine wave, allowing detailed **AC waveform analysis**. |
+| **Channel Mapping** | Logs the **currently active channel**. |
+| **Measurement Sync** | Sampled at the start of each new PWM data frame update. |
+| **Filtering** | **None** (Raw instantaneous current). |
+| **Max Capacity** | **100,000 samples** (~17 seconds of high-res data). |
 
-This data is intended for verifying **skin-contact quality** and **actuator health**. A lower-than-expected current during an "ON" phase typically indicates the actuator is not under physical load (lack of contact).
+This data allows you to visualize the **back-EMF** and real-time current dynamics of the voice coil, acting like a digital oscilloscope.
 
 ## 🧠 Measurement Logic
 
 The `OnPwmSequenceEnd()` interrupt handler drives the measurement loop:
 
-1.  **Check PWM State**: Uses `nrf_pwm_event_check` to determine if we are in the ON or OFF phase.
-2.  **Stable Sampling**: If ON and stable (>300µs), reads `analogRead(A6)`.
-3.  **Filtering**: Applies a simple 90/10 moving average filter: `y[n] = 0.9*y[n-1] + 0.1*x[n]`.
-4.  **Channel Switching**: If the stimulation pattern changes the active channel, the mux switch command is deferred until the next PWM OFF period.
+1.  **Interrupt Trigger**: Fires every ~170µs (when the 8-sample PWM buffer is exhausted).
+2.  **Instant Sampling**: Reads `analogRead(A6)` immediately.
+3.  **Logging**: Converts to Amps and stores in RAM ring buffer.
+4.  **Channel Switching**: Updates multiplexer if the active channel has changed.
 
 ## 🛠️ Building & Flashing
 

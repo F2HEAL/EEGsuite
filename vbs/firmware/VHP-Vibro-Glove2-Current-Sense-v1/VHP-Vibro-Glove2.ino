@@ -79,36 +79,29 @@ void SetSilence() {
 }
 
 void OnPwmSequenceEnd() {
-    static uint32_t last_sample_time = 0;
-    
     if(g_running) {
-        // --- Current Sensing Logic Start ---
-        // 1. Get current PWM state
-        bool pwm_active = (nrf_pwm_event_check(NRF_PWM1, NRF_PWM_EVENT_SEQSTARTED0));
-          
-        // 2. Sample only during stable PWM ON period (skip first 300us of transient)
-        if(pwm_active && (micros() - last_sample_time > 300)) { 
-            // Read from A6 (Pin D10) which is configured for Current Sense
-            // Default 12-bit res, 3.6V ref
-            float adc_val = analogRead(A6); 
+        // --- Waveform Current Sensing Logic ---
+        // This interrupt fires every PWM sequence completion.
+        // With 8 samples per sequence at 46.875 kHz carrier, this runs at ~5.86 kHz.
+        // This provides ~183 samples per cycle for a 32 Hz sine wave.
+
+        // 1. Read Raw ADC Value
+        // A6 (Pin D10) - Default 12-bit res, 3.6V ref
+        float adc_val = analogRead(A6); 
               
-            // 3. Apply moving average filter
-            static float filtered_val = 0;
-            filtered_val = 0.9 * filtered_val + 0.1 * adc_val;
-              
-            // Convert to Amps: (ADC_Val * (V_Ref / Resolution)) / Gain_V_per_A
-            // Assuming 20x gain on 0.25 ohm resistor -> 5V/A (Verify hardware gain!)
-            // Re-using the conversion from the doc: filtered_val * (3.3f/4095.0f)/5.0f
-            g_dlog.LogCurrent(filtered_val * (3.6f/4095.0f)/5.0f); 
-            last_sample_time = micros();
-        }
+        // 2. Convert to Amps and Log immediately
+        // No filtering here - we want to see the raw AC waveform
+        // (ADC_Val * (V_Ref / Resolution)) / Gain_V_per_A
+        g_dlog.LogCurrent(adc_val * (3.6f/4095.0f)/5.0f); 
           
-        // 4. Channel switching only during PWM OFF
-        // Only switch if we need to measure a different channel
-        if(!pwm_active && (measuring_channel != new_channel)) {
-            Multiplexer.ConnectChannel(new_channel); // Connect directly to channel index
+        // 3. Channel switching safety
+        // Only switch if we need to measure a different channel AND we are at a zero-crossing or low point if possible
+        // For now, just switch immediately to keep phase alignment simple
+        if(measuring_channel != new_channel) {
+            Multiplexer.ConnectChannel(new_channel);
             measuring_channel = new_channel;
-            delayMicroseconds(600); // Mux settling time
+            // Short delay might be needed for settling, but at 5kHz we might skip a sample if we delay too long.
+            // MAX14661 switching time is fast (~few us).
         }
         // --- Current Sensing Logic End ---
 

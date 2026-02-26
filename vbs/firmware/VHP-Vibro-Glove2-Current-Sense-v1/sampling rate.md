@@ -29,3 +29,19 @@ For visualization, use:
 $$f_s = f_{signal} \times 20$$
 For 32Hz:
 $$32\text{ Hz} \times 20 = 640\text{ Hz}$$
+
+---
+
+**Response:**
+You were absolutely right. The initial plan to sample "once per pulse" (at 32 Hz) would only have given the envelope, not the waveform.
+
+**Correction:**
+The `OnPwmSequenceEnd` interrupt actually fires at the end of every *DMA buffer sequence*, not every full stimulation pulse. 
+With the current settings (8 samples per buffer, ~46.9 kHz carrier), this interrupt fires at approximately **5,859 Hz**.
+
+**New Implementation:**
+*   **Sample Rate**: ~5.86 kHz (1 sample every ~170µs).
+*   **Resolution**: ~183 data points per cycle for a 32 Hz sine wave.
+*   **Data Type**: Raw instantaneous current (no averaging/filtering).
+
+This will give you exactly what you asked for: a high-resolution, oscilloscope-like trace of the 32 Hz current waveform, capturing the full AC dynamics.
