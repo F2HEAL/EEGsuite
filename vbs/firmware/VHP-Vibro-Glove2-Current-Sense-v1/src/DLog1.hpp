@@ -9,15 +9,14 @@
 
 class DLog {
 private:
-    static constexpr uint32_t kBufferSize = 50000;  // 50k samples (1 sec @ 50kHz)
+    static constexpr uint32_t kBufferSize = 100000;  // 100k samples
     std::array<float, kBufferSize> buffer_;        // Stores current in Amperes
-    uint32_t sample_count_ = 0;
+    volatile uint32_t sample_count_ = 0;
 
 public:
-    // Reset the logger (clears all samples)
+    // Reset the logger (clears index only for speed and atomicity)
     void Reset() { 
         sample_count_ = 0;
-        buffer_.fill(0.0f);
     }
 
     // Log a current measurement (in Amperes)

@@ -300,6 +300,9 @@ void ToggleStream() {
         nrf_gpio_pin_clear(kLedPinGreen);    
         delete g_stream;
     } else {
+        // Reset the current log when starting a new stream to capture from the beginning
+        g_dlog.Reset(); 
+        
         nrf_gpio_pin_set(kLedPinGreen);
         g_stream = new SStream(g_settings.chan8,
                      g_settings.samplerate,
