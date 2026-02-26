@@ -43,7 +43,7 @@ In addition to the standard VHP commands (`1`, `0`, `V{n}`, `F{n}`, etc.), this 
 | **Waveform Capture** | Provides ~183 samples per cycle for a 32Hz sine wave, allowing detailed **AC waveform analysis**. |
 | **Channel Mapping** | Logs the **currently active channel**. |
 | **Measurement Sync** | Sampled at the start of each new PWM data frame update. |
-| **Auto-Reset** | The buffer is automatically cleared when a new stream starts, ensuring the log aligns with the first stimulation event. |
+| **Auto-Reset** | The buffer is automatically cleared when a new stream starts. **t=0 (SampleIndex 0) corresponds exactly to the [0] Stimulation READY event.** |
 | **Filtering** | **None** (Raw instantaneous current). |
 | **Max Capacity** | **100,000 samples** (~17 seconds of high-res data). |
 
