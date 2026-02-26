@@ -34,6 +34,19 @@ In addition to the standard VHP commands (`1`, `0`, `V{n}`, `F{n}`, etc.), this 
     ```
     *Note: The buffer resets automatically after dumping.*
 
+### 🔍 Understanding the Dump File
+
+| Feature | Details |
+| :--- | :--- |
+| **Columns** | `SampleIndex` (pulse count), `Current(A)` (measured load in Amps) |
+| **Timewise Resolution** | **1 sample per stimulation pulse**. The sampling rate matches your `stimfreq` (e.g., at 32Hz, you get 32 samples/sec). |
+| **Channel Mapping** | Logs the **currently active channel**. In a sweep protocol, the log is a continuous stream matching the stimulation sequence. |
+| **Measurement Sync** | Sampled **300µs after the pulse start** to capture stable steady-state current after inductive transients. |
+| **Filtering** | Uses a **90/10 moving average** to filter out Class D switching noise. |
+| **Max Capacity** | **50,000 samples** (~26 minutes at 32Hz). |
+
+This data is intended for verifying **skin-contact quality** and **actuator health**. A lower-than-expected current during an "ON" phase typically indicates the actuator is not under physical load (lack of contact).
+
 ## 🧠 Measurement Logic
 
 The `OnPwmSequenceEnd()` interrupt handler drives the measurement loop:
