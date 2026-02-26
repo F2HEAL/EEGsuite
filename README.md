@@ -1,5 +1,5 @@
-# EEG Software Suite
-Modular EEG platform for high-portability research.
+# F2H VBS EEG Software Suite
+Modular VBS EEG platform for high-portability research.
 
 ## 🛠 Software Parts
 1. **Generate & Record**: Hardware interface and data persistence.
