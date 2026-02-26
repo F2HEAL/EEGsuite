@@ -89,6 +89,10 @@ Generates native HTML visualizations of your recorded data using MNE-python.
     *   `streaming/`: BrainFlow/LSL implementation.
     *   `recording/`: Sweep protocol implementation.
     *   `analysis/`: Data processing tools.
+    *   `vbs/`: Hardware-specific resources.
+        *   `firmware/`: VHP device source code (Main & Experimental).
+            *   See [Firmware Technical Docs](../vbs/firmware/README.md#technical-documentation) for hardware-level sensing and timing guides.
+        *   `webui/`: Bluetooth control interface.
 
 ---
 
