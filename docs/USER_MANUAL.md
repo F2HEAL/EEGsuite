@@ -27,44 +27,52 @@ The hardware setup is designed for maximum signal purity and participant safety:
 
 ---
 
-## 🚀 Quick Start
+## 🧪 Experiment Procedure & Quick Start
 
-### 1. Installation
-Ensure you have Python 3.10+ installed. Clone the repository and install dependencies:
+### 1. Preparation
+1.  **Open Workspace**:
+    *   VS Code: Open `D:\F2H_code\GH\EEGsuite`
+    *   File Explorer: Open data folder `G:\My Drive\SharedData\` (if using cloud sync)
+
+2.  **Hardware Connection**:
+    *   Connect the **FreeEEG32** board to the acquisition PC (LSL Server).
+    *   Connect the **VHP Stimulator** (VBS) to the control PC (Master).
+    *   *Note: These can be the same PC or separate PCs on the same local network.*
+
+3.  **Verify COM Ports**:
+    *   Open Windows Device Manager (`devmgmt.msc`).
+    *   Note the COM port for the EEG board (e.g., `COM3`).
+    *   Note the COM port for the VHP Stimulator (e.g., `COM5`).
+
+4.  **Configuration**:
+    *   Edit `.\config\hardware\freeeeg.yaml`.
+    *   Update `Board: Serial` and `VHP: Serial` to match your noted COM ports.
+
+### 2. Start LSL Stream (Acquisition Node)
+Run this on the PC connected to the EEG board.
+
 ```powershell
-pip install -r requirements.txt
+python -m src.main server -c .\config\hardware\freeeeg.yaml
 ```
+*   **Verify**: Wait for the message `* LSL stream 'BrainFlowEEG' is now active`.
 
-### 2. Configure Your Hardware
-Edit `config/hardware/freeeeg.yaml` to match your COM ports:
-```yaml
-Board:
-  Id: FREEEEG32_BOARD
-  Serial: "COM3"
-VHP:
-  Serial: "COM5"
+### 3. Run Experiment (Control Node)
+Run this on the PC connected to the VHP Stimulator.
+
+```powershell
+python -m src.main sweep -d .\config\hardware\freeeeg.yaml -p .\config\protocols\sweep_default.yaml
 ```
+*   **Procedure**: Follow the on-screen prompts (e.g., "Press SPACEBAR when ready").
+*   **Output**: Data is automatically saved to `data/raw/` (or your configured cloud path).
 
----
+### 4. Analyze Data (Post-Processing)
+Generate HTML reports and plots from the recorded CSV files.
 
-## 🛠 Command Reference
-
-The suite uses a unified CLI: `python -m src.main <command> [options]`
-
-### `server` (The LSL Bridge)
-Starts the BrainFlow driver and creates an LSL stream.
-*   **Usage**: `python -m src.main server -c .\config\hardware\freeeeg.yaml`
-*   **Action**: Look for the log `* LSL stream 'BrainFlowEEG' is now active`.
-
-### `sweep` (The Experiment Engine)
-Runs the automated protocol, controlling both EEG recording and the VHP stimulator.
-*   **Usage**: `python -m src.main sweep -d .\config\hardware\freeeeg.yaml -p .\config\protocols\sweep_default.yaml`
-*   **Protocol**: It will execute baselines and measurements defined in your protocol YAML.
-
-### `analyze` (The Data Visualizer)
-Generates native HTML visualizations of your recorded data using MNE-python.
-*   **Usage**: `python -m src.main analyze -f .\data\session_01.csv -s 0.0 -d 60.0`
-*   **Action**: Look for the report in the `\reports` folder.
+```powershell
+# Example: Analyze a specific file from start (0s) to 60s
+python -m src.main analyze -f "G:\My Drive\SharedData\data\raw\YOUR_FILE_NAME.csv" -s 0 -d 60
+```
+*   **Result**: Check the `reports/` folder for the generated `.html` analysis file.
 *   **Customization**: Edit `config\analysis\default_offline.yaml` to change channel names, montage, or filter frequencies.
 *   **Montage Switching**: To change electrode layouts (e.g., from 32-channel to 8-channel), change the `montage_profile` in `config\analysis\default_offline.yaml`.
     *   `kullab`: Standard 32-channel layout.
@@ -72,10 +80,6 @@ Generates native HTML visualizations of your recorded data using MNE-python.
 *   **Channel Picking**: You can manually override which channels appear in the report by editing the `pick_channels` list in `config\analysis\default_offline.yaml`.
     *   If `pick_channels` is defined in the main YAML, it takes priority over the montage profile's defaults.
     *   This affects all plots: Timeseries, Spectrograms, PSD, and ERPs.
-*   **Options**:
-    *   `-f, --file`: Path to the CSV file.
-    *   `-s, --start`: Start time in seconds (default: 0.0).
-    *   `-d, --duration`: Window size in seconds (default: 60.0).
 
 ---
 
