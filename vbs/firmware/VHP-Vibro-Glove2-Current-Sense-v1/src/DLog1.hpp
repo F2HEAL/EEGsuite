@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// DLog1.hpp - Single-channel current logger (raw values only)
+// DLog1.hpp - Dual-channel logger for Voltage (estimated) and Current
 
 #ifndef DLOG1_HPP_
 #define DLOG1_HPP_
@@ -7,22 +7,29 @@
 #include <Arduino.h>
 #include <array>
 
+struct LogSample {
+    float voltage; // Estimated voltage (from PWM)
+    float current; // Measured current
+};
+
 class DLog {
 private:
-    static constexpr uint32_t kBufferSize = 100000;  // 100k samples
-    std::array<float, kBufferSize> buffer_;        // Stores current in Amperes
+    // Buffer for ~0.85 seconds of data at 5.86 kHz (enough for >30 cycles at 40 Hz)
+    static constexpr uint32_t kBufferSize = 5000;  
+    std::array<LogSample, kBufferSize> buffer_; 
     volatile uint32_t sample_count_ = 0;
 
 public:
-    // Reset the logger (clears index only for speed and atomicity)
+    // Reset the logger
     void Reset() { 
         sample_count_ = 0;
     }
 
-    // Log a current measurement (in Amperes)
-    void LogCurrent(float current_A) {
+    // Log a sample pair
+    void Log(float voltage_V, float current_A) {
         if (sample_count_ < kBufferSize) {
-            buffer_[sample_count_++] = current_A;
+            buffer_[sample_count_] = {voltage_V, current_A};
+            sample_count_++;
         }
     }
 
@@ -33,16 +40,15 @@ public:
 
     // Print all samples to Serial (CSV format)
     void PrintRawData() const {
-        Serial.println("SampleIndex,Current(A)");
+        Serial.println("SampleIndex,Voltage(V),Current(A)");
         for (uint32_t i = 0; i < sample_count_; i++) {
             Serial.print(i);
             Serial.print(",");
-            Serial.println(buffer_[i], 6);  // 6 decimal places
+            Serial.print(buffer_[i].voltage, 4);
+            Serial.print(",");
+            Serial.println(buffer_[i].current, 6);
         }
     }
-
-    // Get direct access to samples (for analysis)
-    const float* GetSamples() const { 
-        return buffer_.data(); 
-    }
 };
+
+#endif // DLOG1_HPP_

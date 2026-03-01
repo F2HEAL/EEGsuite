@@ -2,6 +2,11 @@
 data/
 reports/
 logs/
+
+# Office temp files
+~$*
+.~lock.*
+
 __pycache__/
 *.py[cod]
 .venv/

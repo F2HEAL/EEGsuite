@@ -1,66 +1,41 @@
-# VHP-Vibro-Glove2-Current-Sense-v1
+# VHP-Vibro-Glove2-Current-Sense-v1 (Oscilloscope Mode)
 
-This is a specialized firmware branch for the **VHP (Vibro-Tactile Haptics Platform)** that integrates **real-time current sensing** with the standard stimulation protocol.
+This firmware is now configured as a **40Hz Oscilloscope** for analyzing VHP driver performance.
 
-## 🌟 Key Features
+## 🌟 Key Features (Oscilloscope Mode)
 
-1.  **Based on Stable Core**: Built upon the `SERCOM_2_0_2_BETA` foundation, ensuring reliable volume control and parameter handling.
-2.  **Synchronized Current Sensing**: 
-    *   Implements intelligent ADC sampling synchronized with the PWM cycle.
-    *   **High-Speed Sampling**: Samples are taken at the full PWM sequence rate (~5.86 kHz) to capture the AC current waveform.
-    *   **Mux Protection**: Multiplexer channel switching occurs exclusively during the PWM OFF period to prevent arcing and settle-time artifacts.
-3.  **Data Logging**: Uses a high-speed ring buffer (`DLog`) to store up to **100,000 current samples** (~17 seconds at 5.86kHz).
+1.  **Forced 40Hz Stimulation**: Defaults to 40Hz sine wave on Channel 1 at 80% volume.
+2.  **Dual-Channel Logging**: Captures both **Estimated Voltage** (from PWM) and **Measured Current**.
+3.  **Low-Pass Filtering**: Includes a 150Hz digital low-pass filter to remove switching noise.
+4.  **High-Speed Buffer**: Stores 5000 samples (~0.85s) covering >30 cycles of 40Hz.
 
-## 🔌 Hardware Configuration
+## 🔌 Logging Format & Mapping
 
-This firmware assumes the following pin mapping for the nRF52840 (MDBT50Q):
+The `C` command dumps 3 columns. Note the mapping between software and hardware:
+*   **WebUI/Serial CH1** maps to **PCB CH8** (0-indexed) or **CH9** (1-indexed).
+*   The firmware automatically handles this mapping using the `order_pairs` array.
 
-*   **Current Sense Input**: Pin **D10 / A6** (P0.03/AIN1).
-*   **Mux Enable**: Pin **D2** (P0.02).
-*   **I2C Bus (Mux Control)**:
-    *   SCL: Pin 25
-    *   SDA: Pin 24
+```csv
+SampleIndex,Voltage(V),Current(A)
+0,0.0000,0.001234
+...
+```
+
+## 📊 Analysis
+
+Run `python plot_dump.py` to see the voltage and current waveforms aligned in time. This allows you to verify phase relationships and driver behavior.
+
+## 🛠️ Configuration
+
+To change back to standard mode, edit `VHP-Vibro-Glove2-Current-Sense-v1.ino` and remove the "FORCED MODE" block in `setup()`.
 
 ## 📜 Serial Commands
 
-In addition to the standard VHP commands (`1`, `0`, `V{n}`, `F{n}`, etc.), this firmware adds:
+*   `1`: Start 40Hz Stream
+*   `0`: Stop Stream (and stop continuous load output)
+*   `C`: Dump Voltage/Current Log (Buffer reset after dump)
+*   `W`: One-shot VCA Load Estimation (Peak Amps)
+*   `w`: Toggle Continuous VCA Load Estimation (every 100ms)
+*   `S`: Status / Version Info
+*   `X`: Parameter string dump (includes `W` for load)
 
-*   `C`: **Dump Current Log**. detailed CSV output of the current buffer.
-    ```csv
-    SampleIndex,Current(A)
-    0,0.01234
-    1,0.01245
-    ...
-    ```
-    *Note: The buffer resets automatically after dumping.*
-
-### 🔍 Understanding the Dump File
-
-| Feature | Details |
-| :--- | :--- |
-| **Columns** | `SampleIndex`, `Current(A)` |
-| **Sample Rate** | **~5,859 Hz** (Samples every PWM sequence completion). |
-| **Waveform Capture** | Provides ~183 samples per cycle for a 32Hz sine wave, allowing detailed **AC waveform analysis**. |
-| **Channel Mapping** | Logs the **currently active channel**. |
-| **Measurement Sync** | Sampled at the start of each new PWM data frame update. |
-| **Auto-Reset** | The buffer is automatically cleared when a new stream starts. **t=0 (SampleIndex 0) corresponds exactly to the [0] Stimulation READY event.** |
-| **Filtering** | **None** (Raw instantaneous current). |
-| **Max Capacity** | **100,000 samples** (~17 seconds of high-res data). |
-
-This data allows you to visualize the **back-EMF** and real-time current dynamics of the voice coil, acting like a digital oscilloscope.
-
-## 🧠 Measurement Logic
-
-The `OnPwmSequenceEnd()` interrupt handler drives the measurement loop:
-
-1.  **Interrupt Trigger**: Fires every ~170µs (when the 8-sample PWM buffer is exhausted).
-2.  **Instant Sampling**: Reads `analogRead(A6)` immediately.
-3.  **Logging**: Converts to Amps and stores in RAM ring buffer.
-4.  **Channel Switching**: Updates multiplexer if the active channel has changed.
-
-## 🛠️ Building & Flashing
-
-1.  Open `VHP-Vibro-Glove2-Current-Sense-v1.ino` in Arduino IDE.
-2.  Ensure you have the `Adafruit nRF52` board support package installed.
-3.  Select Board: **Adafruit Feather nRF52840 Sense** (or generic nRF52840).
-4.  Compile and Upload.

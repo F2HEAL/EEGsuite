@@ -11,6 +11,7 @@ const char* FIRMWARE_VERSION = "SERCOM_2_0_3_CURRENT_SENSE_v1";  // volume corre
 #include "src/Settings.hpp"
 #include "src/Max14661.hpp"
 #include "src/DLog1.hpp"
+#include "src/SimpleFilter.hpp"
 
 using namespace audio_tactile;
 
@@ -27,36 +28,53 @@ String serialBuffer = "";
 
 // Current Sensing Objects
 DLog g_dlog;
-int measuring_channel = 0;
+SimpleFilter g_current_filter(5860.0f, 150.0f);  // 5860 Hz sampling, 150 Hz cutoff
+int measuring_channel = -1; // Force connection on first update
 int new_channel = 0;
 
-void setup() {
+// Runtime Load Estimation (Peak Current Monitor)
+bool g_continuous_load_output = false;
 
+void setup() {
+    Serial.begin(115200);
+    delay(500); 
+    
     nrf_gpio_cfg_output(kLedPinBlue);
     nrf_gpio_cfg_output(kLedPinGreen);  
     nrf_gpio_pin_set(kLedPinBlue);
+
+    // Hardware Enable: Pin 42 set to 0 (Matches known-working FW)
+    nrf_gpio_cfg_output(42);
+    nrf_gpio_pin_write(42, 0); 
     
-    // Initialize Multiplexer
+    // --- FORCE SETTINGS FOR 40Hz OSCILLOSCOPE MODE ---
+    g_settings.stimfreq = 40;        
+    g_settings.single_channel = 5;   // Force WebUI Channel 5
+    g_settings.volume = 80;          
+    g_settings.chan8 = true;         
+    g_settings.test_mode = true;     
+    Serial.println("FORCED MODE: 40Hz, WebUI CH5 (PCB CH4), Volume 80%");
+
     Multiplexer.Initialize();
+    Multiplexer.Enable();
+    Multiplexer.ConnectChannel(order_pairs[4]); // Pre-connect Mux to CH5
+    measuring_channel = 4;
     
     PwmTactor.OnSequenceEnd(OnPwmSequenceEnd);
     PwmTactor.Initialize();
     
+    // PWM0 is auto-triggered on nRF52 Arduino, only trigger 1 and 2
     nrf_pwm_task_trigger(NRF_PWM1, NRF_PWM_TASK_SEQSTART0);
     nrf_pwm_task_trigger(NRF_PWM2, NRF_PWM_TASK_SEQSTART0);
     
     PuckBatteryMonitor.InitializeLowVoltageInterrupt();
     PuckBatteryMonitor.OnLowBatteryEventListener(LowBatteryWarning);
 
-    // Create BLE name with version (using char array instead of String)
-    char bleName[32];  // BLE names have max 31 chars + null terminator
+    char bleName[32];
     snprintf(bleName, sizeof(bleName), "F2Heal VHP v%s", FIRMWARE_VERSION);
-    
     BleCom.Init(bleName, OnBleEvent);
 
-    // Initialize volume level based on settings
     g_volume_lvl = g_settings.volume * g_settings.vol_amplitude / 100;
-
     SetSilence();
 
     nrf_gpio_cfg_input(kTactileSwitchPin, NRF_GPIO_PIN_PULLUP);
@@ -69,9 +87,7 @@ void setup() {
     nrf_gpio_pin_clear(kLedPinBlue);
     nrf_gpio_pin_clear(kLedPinGreen);  
     
-    if(g_settings.start_stream_on_power_on) {
-        ToggleStream();
-    }
+    if(g_settings.start_stream_on_power_on) ToggleStream();
 }
 
 void SetSilence() {
@@ -80,52 +96,50 @@ void SetSilence() {
 
 void OnPwmSequenceEnd() {
     if(g_running) {
-        // --- Waveform Current Sensing Logic ---
-        // This interrupt fires every PWM sequence completion.
-        // With 8 samples per sequence at 46.875 kHz carrier, this runs at ~5.86 kHz.
-        // This provides ~183 samples per cycle for a 32 Hz sine wave.
-
-        // 1. Read Raw ADC Value
-        // A6 (Pin D10) - Default 12-bit res, 3.6V ref
-        float adc_val = analogRead(A6); 
-              
-        // 2. Convert to Amps and Log immediately
-        // No filtering here - we want to see the raw AC waveform
-        // (ADC_Val * (V_Ref / Resolution)) / Gain_V_per_A
-        g_dlog.LogCurrent(adc_val * (3.6f/4095.0f)/5.0f); 
-          
-        // 3. Channel switching safety
-        // Only switch if we need to measure a different channel AND we are at a zero-crossing or low point if possible
-        // For now, just switch immediately to keep phase alignment simple
-        if(measuring_channel != new_channel) {
-            Multiplexer.ConnectChannel(new_channel);
-            measuring_channel = new_channel;
-            // Short delay might be needed for settling, but at 5kHz we might skip a sample if we delay too long.
-            // MAX14661 switching time is fast (~few us).
-        }
-        // --- Current Sensing Logic End ---
-
         g_stream->next_sample_frame();
-        
         const auto active_channel = g_stream->current_active_channel();
         
-        // Update new_channel for the next mux switch opportunity
-        new_channel = active_channel;
-        
-        for(uint32_t channel = 0; channel < g_stream->channels(); channel++)
+        // Match Old FW logic: Only update Mux or Sample, never both at once.
+        if(active_channel != (uint32_t)measuring_channel) {
+            measuring_channel = active_channel;
+            Multiplexer.ConnectChannel(order_pairs[measuring_channel]);
+        } else {
+            // Use A6 for current sensing (PCB AIN6)
+            int16_t raw_adc = analogRead(A6);
+            
+            // --- Current Calibration Block ---
+            const float ADC_REF = 3.6f;
+            const float GAIN_V_PER_A = 5.0f; 
+            const float CAL_FACTOR = 1.0f;   
+            
+            // BIAS SETTING: Set to 0.0 for unipolar, 1.8 for mid-point biased hardware
+            const float ADC_BIAS_VOLTS = 0.0f; 
+            
+            float voltage_at_pin = (raw_adc / 1023.0f) * ADC_REF;
+            float current_amps = ((voltage_at_pin - ADC_BIAS_VOLTS) / GAIN_V_PER_A) * CAL_FACTOR;
+            
+            // Update VCA Load Estimation (Leaky Peak Detector)
+            if (current_amps > g_settings.vca_load_estimation) {
+                g_settings.vca_load_estimation = current_amps;
+            } else {
+                g_settings.vca_load_estimation *= 0.9999f; 
+            }
+
+            // Estimate drive voltage from PWM
+            float voltage_est = (float)PwmTactor.GetChannelPointer(active_channel)[0] * (3.7f / 512.0f);
+            
+            g_dlog.Log(voltage_est, current_amps);
+        }
+
+        // Update PWM buffers
+        for(uint32_t channel = 0; channel < g_stream->channels(); channel++) {
             if(channel==active_channel) {
                 uint16_t* cp = PwmTactor.GetChannelPointer(channel);
                 g_stream->set_chan_samples(cp, channel);
-
-                if(!g_settings.chan8) {
-                    uint16_t* cp = PwmTactor.GetChannelPointer(7-channel);
-                    g_stream->set_chan_samples(cp, channel);
-                }
             } else {
                 PwmTactor.SilenceChannel(channel, g_volume_lvl);
-                if(!g_settings.chan8)
-                    PwmTactor.SilenceChannel(7-channel, g_volume_lvl);
             }
+        }
     } else {
         for(uint32_t i = 0; i < g_settings.default_channels; i++)
             PwmTactor.SilenceChannel(i, g_volume_lvl);
@@ -133,6 +147,14 @@ void OnPwmSequenceEnd() {
 }
 
 void loop() {
+  // Continuous Load Output Logic
+  static unsigned long last_load_print = 0;
+  if (g_continuous_load_output && (millis() - last_load_print > 100)) {
+      last_load_print = millis();
+      Serial.print("vca_load_estimation:");
+      Serial.println(g_settings.vca_load_estimation, 4);
+  }
+
   if (Serial.available() > 0) {
     char cmd = Serial.read();
 
@@ -161,6 +183,7 @@ void processSerialCommand(String cmd) {
     }
     else if (c == '0') {
       StopStream();
+      g_continuous_load_output = false; // Stop continuous output on '0'
       Serial.write('0');
     }
     else if (c == 'T') {
@@ -170,6 +193,11 @@ void processSerialCommand(String cmd) {
     else if (c == 'L') {
       Serial.write('L');
     }
+    else if (c == 'w') { // Lowercase 'w' for continuous load output
+      g_continuous_load_output = !g_continuous_load_output;
+      if (g_continuous_load_output) Serial.println("Continuous load output enabled");
+      else Serial.println("Continuous load output disabled");
+    }
     else if (c == 'S') {  // Added 'S' command to get version
       Serial.print("FW Version: ");
       Serial.println(FIRMWARE_VERSION);
@@ -177,6 +205,10 @@ void processSerialCommand(String cmd) {
     else if (c == 'C') { // Added 'C' command to dump current log
         g_dlog.PrintRawData();
         g_dlog.Reset(); // Clear after dumping
+    }
+    else if (c == 'W') { // 'W' for Weight/Work/Load estimation
+        Serial.print("vca_load_estimation:");
+        Serial.println(g_settings.vca_load_estimation, 4);
     }
 
     else if (c == 'X') {
@@ -301,7 +333,9 @@ void ToggleStream() {
         delete g_stream;
     } else {
         // Reset the current log when starting a new stream to capture from the beginning
-        g_dlog.Reset(); 
+        g_dlog.Reset();
+        g_current_filter.Reset();  // Reset filter to avoid startup transients 
+        g_settings.vca_load_estimation = 0.0f; // Reset load estimation for new stream
         
         nrf_gpio_pin_set(kLedPinGreen);
         g_stream = new SStream(g_settings.chan8,
@@ -398,4 +432,5 @@ namespace std {
     void __throw_length_error(char const* e) {
         while (true) {}    
     }
-}	
+}
+    

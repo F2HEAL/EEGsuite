@@ -44,14 +44,17 @@ struct Settings {
     bool test_mode = true;
     uint16_t single_channel = 1;
 
+    // Runtime Load Estimation (Peak Current Monitor)
+    mutable float vca_load_estimation = 0.0f;
+
     /**
      * Gets the default parameter string as const char*
      */
     const char* get_default_parameter_string() const {
-        static char buffer[64];  // static to persist between calls
+        static char buffer[128];  // Increased size for new parameter
         
         snprintf(buffer, sizeof(buffer), 
-                 "V%u F%u D%u Y%u P%u Q%u J%u M%u C%u",
+                 "V%u F%u D%u Y%u P%u Q%u J%u M%u C%u W%.4f",
                  volume,
                  stimfreq,
                  stimduration,
@@ -60,7 +63,8 @@ struct Settings {
                  pauzedcycles,
                  jitter,
                  test_mode ? 1 : 0,
-                 single_channel);
+                 single_channel,
+                 vca_load_estimation);
         
         return buffer;
     }

@@ -47,19 +47,8 @@ namespace {
 	    NRF_TWIM0->TXD.PTR = (uint32_t)&tx_buf[0];
 
 	    NRF_TWIM0->EVENTS_STOPPED = 0;
-	    NRF_TWIM0->EVENTS_ERROR = 0;
 	    NRF_TWIM0->TASKS_STARTTX = 1;
-	    
-	    // Robust timeout loop: check for STOP or ERROR
-	    uint32_t timeout = 5000; 
-	    while (NRF_TWIM0->EVENTS_STOPPED == 0 && NRF_TWIM0->EVENTS_ERROR == 0 && timeout-- > 0) {
-	        delayMicroseconds(1);
-	    }
-	    
-	    // Clear error if it happened to prevent peripheral lockup
-	    if (NRF_TWIM0->EVENTS_ERROR) {
-	        NRF_TWIM0->EVENTS_ERROR = 0;
-	        NRF_TWIM0->TASKS_RESUME = 1; 
+	    while (NRF_TWIM0->EVENTS_STOPPED == 0) {
 	    }
 	}
 
@@ -120,18 +109,17 @@ namespace {
 	}
 
 	void i2c_init(uint8_t scl, uint8_t sda, uint8_t device_addr) {
-	    // Configure SCL and SDA with internal Pull-ups in case they are missing on hardware
 	    *pincfg_reg(scl) =
 		((uint32_t)GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |
 		((uint32_t)GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos) |
-		((uint32_t)GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos) |
+		((uint32_t)GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos) |
 		((uint32_t)GPIO_PIN_CNF_DRIVE_S0D1 << GPIO_PIN_CNF_DRIVE_Pos) |
 		((uint32_t)GPIO_PIN_CNF_SENSE_Disabled << GPIO_PIN_CNF_SENSE_Pos);
 
 	    *pincfg_reg(sda) =
 		((uint32_t)GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |
 		((uint32_t)GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos) |
-		((uint32_t)GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos) |
+		((uint32_t)GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos) |
 		((uint32_t)GPIO_PIN_CNF_DRIVE_S0D1 << GPIO_PIN_CNF_DRIVE_Pos) |
 		((uint32_t)GPIO_PIN_CNF_SENSE_Disabled << GPIO_PIN_CNF_SENSE_Pos);
 
@@ -139,8 +127,7 @@ namespace {
 	    NRF_TWIM0->PSEL.SDA = sda;
 
 	    NRF_TWIM0->ADDRESS = device_addr;
-	    // Use 100kHz for maximum reliability
-	    NRF_TWIM0->FREQUENCY = TWIM_FREQUENCY_FREQUENCY_K100
+	    NRF_TWIM0->FREQUENCY = TWIM_FREQUENCY_FREQUENCY_K400
 		<< TWIM_FREQUENCY_FREQUENCY_Pos;
 	    NRF_TWIM0->SHORTS = 0;
 
@@ -175,9 +162,9 @@ namespace audio_tactile {
 	    kMax14661Address1 = 0x4C,  // A0: 0, A1: 0. b1001100
 	    kMax14661Address2 = 0x4E,  // A0: 0, A1: 1. b1001110
 	    // Pin definitions.
-	    kMuxEnable = 2,  // P0.02 (Corrected from 29 which is AIN5)
-	    kSclPin = 25,    // Matches Schematic P0.25
-	    kSdaPin = 24     // Matches Schematic P0.24
+	    kMuxEnable = 2,
+	    kSclPin = 25,
+	    kSdaPin = 24
 	};
 	// Initializes the two muxes.
 	void Initialize() {
@@ -187,8 +174,8 @@ namespace audio_tactile {
 	    // Sets mux enable pin as output (both muxes are connected to same pin).
 	    nrf_gpio_cfg_output(kMuxEnable);
 
-	    // Enables the muxes (Active High).
-	    nrf_gpio_pin_set(kMuxEnable);
+	    // Enables the muxes.
+	    nrf_gpio_pin_write(kMuxEnable, 1);
 	}
 
 
@@ -210,6 +197,7 @@ namespace audio_tactile {
 		    uint8_t value;  // Value to write, representing a switch connection.
 		} connections[2];
 	    }
+
 		kChannelSettings[12] = {
 		// Channel 0 (Schematic label: kPwmL1Pin).
 		{
