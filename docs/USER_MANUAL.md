@@ -83,6 +83,19 @@ Set the `EEG_CLOUD_ROOT` environment variable. The system will create `data/`, `
 *   **Windows (PowerShell)**: `[System.Environment]::SetEnvironmentVariable('EEG_CLOUD_ROOT', 'D:\EEG_Storage', 'User')`
 *   **Linux/Mac**: `export EEG_CLOUD_ROOT="/path/to/storage"`
 
+#### Option 3: Google Drive Integration (Automated API)
+For researchers using Google Drive, a dedicated utility is available in `src/utils/google_drive.py`. This uses the Google Drive API for authenticated downloads.
+
+1.  **Setup**: Place your `credentials.json` from Google Cloud Console in the `config/` directory.
+2.  **Configure**: Update `config/google_drive.yaml` with your target `folder_id`.
+3.  **Run**: 
+    ```powershell
+    python src/utils/google_drive.py
+    ```
+4.  **Authentication**: The first run will open a browser for OAuth2 authentication. Subsequent runs will use the stored `config/token.json` until it expires.
+
+For administrators managing permissions and test users, see the **[Google Drive Admin Guide](ADMIN_GOOGLE_DRIVE.md)**.
+
 ---
 
 ## 🧪 Development Rules

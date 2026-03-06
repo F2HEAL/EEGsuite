@@ -1,0 +1,10 @@
+# Google Drive Configuration for EEGsuite
+# Replace with your actual Drive Folder ID
+folder_id: "1EFdlen0VrpPKTZy0TiPSr87oXyLnc0bZ"
+
+# Where to store the credentials locally (relative to project root)
+token_path: "config/token.json"
+credentials_path: "config/credentials.json"
+
+# Download directory
+download_dir: "data/raw"
