@@ -118,10 +118,26 @@ class EEGSweep:
 
     def connect_lsl(self) -> None:
         """Resolves and connects to the LSL stream."""
-        from pylsl import StreamInlet, resolve_stream
+        try:
+            from pylsl import StreamInlet, resolve_stream
+            resolver = "resolve_stream"
+        except ImportError:
+            from pylsl import StreamInlet, resolve_streams
+            resolve_stream = None
+            resolver = "resolve_streams"
         logger.info("Resolving LSL stream: '%s' (Timeout: 5s)...", self.config.stream_name)
-        # Use positional arguments: prop, value, minimum, timeout
-        streams = resolve_stream("name", self.config.stream_name, 1, 5.0)
+        if resolve_stream is not None:
+            # Use positional arguments: prop, value, minimum, timeout
+            streams = resolve_stream("name", self.config.stream_name, 1, 5.0)
+        else:
+            # Fall back to resolve_streams() and filter by name for newer pylsl builds
+            try:
+                all_streams = resolve_streams(5.0)
+            except TypeError:
+                all_streams = resolve_streams()
+            streams = [s for s in all_streams if s.name() == self.config.stream_name]
+            logger.debug("Filtered %d streams using %s.", len(streams), resolver)
+
         
         if not streams:
             logger.error("❌ Could not find LSL stream '%s'.", self.config.stream_name)
