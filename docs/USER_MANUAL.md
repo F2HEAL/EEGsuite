@@ -30,7 +30,7 @@ The hardware setup is designed for maximum signal purity and participant safety:
 
 ## 🧪 Experiment Procedure & Quick Start
 
-For detailed instructions on preparing the hardware, starting the LSL stream, and running experimental protocols, please refer to the **[Quick Start Guide](QUICK_START.md)**.
+For detailed instructions on preparing the hardware, starting the LSL stream, and running experimental protocols, please refer to the **[Quick Start Guide](protocol/QUICK_START.md)**.
 
 ---
 
