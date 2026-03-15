@@ -5,19 +5,6 @@
 # Options: "kullab", "freg8", or path to custom YAML
 montage_profile: freg8
 
-# Channel Mapping (Fallback if profile not found)
-channels: [
-    F7, F3, Fz, F4, F8,
-    FC5, FC1, FC2, FC6,
-    FT9, T7, C3, Cz, C4, T8, FT10,
-    CP5, CP1, CP2, CP6,
-    TP9, P7, P3, Pz, P4, P8, TP10,
-    O1, PO9, PO10, O2,
-    Iz
-]
-
-montage: standard_1020 # Standard labels allow MNE to find 3D coordinates
-
 # Filtering settings
 fmin: 1.5
 fmax: 100.0
