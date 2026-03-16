@@ -25,6 +25,7 @@ def main():
     # Server command
     server_parser = subparsers.add_parser("LSLserver", help="Start LSL Server")
     server_parser.add_argument("-c", "--config", type=str, required=True, help="Hardware config file")
+    server_parser.add_argument("-m", "--montage", type=str, help="Montage YAML file for channel names")
 
     # Sweep command
     sweep_parser = subparsers.add_parser("sweep", help="Run Sweep Protocol")
@@ -64,6 +65,11 @@ def main():
         config_path = Path(args.config)
         from src.utils.config import load_yaml
         config = load_yaml(config_path)
+        
+        # Add montage path to config if provided
+        if args.montage:
+            config["montage_path"] = args.montage
+            
         server = LSLServer(config)
         server.run()
 

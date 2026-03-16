@@ -44,7 +44,11 @@ This guide provides a step-by-step walkthrough for preparing, running, and analy
 Run this on the PC connected to the EEG board.
 
 ```bash
+# Basic start
 python -m src.main LSLserver -c config/hardware/freeeeg_only.yaml
+
+# Start with a montage to broadcast electrode names (e.g., F3, F4) via LSL metadata
+python -m src.main LSLserver -c config/hardware/freeeeg_only.yaml -m config/montages/freg8.yaml
 ```
 *   **Verify**: Wait for the message `* LSL stream 'BrainFlowEEG' is now active`.
 

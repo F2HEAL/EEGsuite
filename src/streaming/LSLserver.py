@@ -1,5 +1,6 @@
 import logging
 import time
+from pathlib import Path
 from typing import Dict, Any, Optional
 
 from brainflow.board_shim import BoardIds, BoardShim, BrainFlowInputParams, LogLevels
@@ -47,25 +48,50 @@ class LSLServer:
         logger.info("Session prepared successfully.")
 
     def setup_lsl(self) -> None:
-        """Initializes the LSL outlet."""
+        """Initializes the LSL outlet with optional channel metadata."""
         if not self.board_shim:
             raise RuntimeError("Board must be set up before LSL.")
 
         board_id = self.board_shim.get_board_id()
         sampling_rate = BoardShim.get_sampling_rate(board_id)
         eeg_channels = BoardShim.get_eeg_channels(board_id)
+        num_channels = len(eeg_channels)
         
         # Use a name from config if available
-        stream_name = self.config.get("Board", {}).get("StreamName", "BrainFlow")
+        stream_name = self.config.get("Board", {}).get("StreamName", "BrainFlowEEG")
         
         info = StreamInfo(
             stream_name,
             "EEG",
-            len(eeg_channels),
+            num_channels,
             sampling_rate,
             "float32",
             f"brainflow_{board_id}",
         )
+
+        # Handle Montage / Channel Names
+        montage_path = self.config.get("montage_path")
+        channel_names = []
+        if montage_path:
+            try:
+                montage_cfg = load_yaml(Path(montage_path))
+                channel_names = montage_cfg.get("channels", [])
+                logger.info("Loaded montage from %s with %d names", 
+                            montage_path, len(channel_names))
+            except Exception as e:
+                logger.error("Could not load montage file: %s", e)
+
+        # Add metadata to the stream info
+        channels_node = info.desc().append_child("channels")
+        for i in range(num_channels):
+            # Fallback to "Channel X" if montage is missing or too short
+            label = channel_names[i] if i < len(channel_names) else f"Channel {i}"
+            
+            chan_node = channels_node.append_child("channel")
+            chan_node.append_child_value("label", str(label))
+            chan_node.append_child_value("unit", "microvolts")
+            chan_node.append_child_value("type", "EEG")
+
         self.outlet = StreamOutlet(info)
         logger.info("LSL Stream initialized: %s", stream_name)
 
