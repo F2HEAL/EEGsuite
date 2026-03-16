@@ -52,7 +52,17 @@ python -m src.main LSLserver -c config/hardware/freeeeg_only.yaml -m config/mont
 ```
 *   **Verify**: Wait for the message `* LSL stream 'BrainFlowEEG' is now active`.
 
-## 3. Start Real-time Monitor (Visualization Node)
+## 3.a Assess LSL Stream Quality (Diagnostic)
+Before starting the experiment, verify the LSL stream metadata and timing stability.
+
+```bash
+# Run the analyzer from the project root
+python src/utils/lsl-tools-1/lsl_stream_analyser.py
+```
+*   **Check**: Ensure "Timing quality" is `Excellent` or `Good`.
+*   **Metadata**: Verify that electrode labels (if using `-m` in step 2) are correctly displayed in the "CHANNEL NAMES" section.
+
+## 3.b Start Real-time Monitor (Visualization Node)
 Run this on the 'EEG Visualization PC' from the [EEGlslviewer](https://github.com/F2HEAL/EEGlslviewer) repository to monitor signal quality.
 
 ```bash
