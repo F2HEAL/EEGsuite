@@ -44,7 +44,7 @@ This guide provides a step-by-step walkthrough for preparing, running, and analy
 Run this on the PC connected to the EEG board.
 
 ```bash
-python -m src.main server -c config/hardware/freeeeg.yaml
+python -m src.main LSLserver -c config/hardware/freeeeg_only.yaml
 ```
 *   **Verify**: Wait for the message `* LSL stream 'BrainFlowEEG' is now active`.
 

@@ -23,7 +23,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Server command
-    server_parser = subparsers.add_parser("server", help="Start LSL Server")
+    server_parser = subparsers.add_parser("LSLserver", help="Start LSL Server")
     server_parser.add_argument("-c", "--config", type=str, required=True, help="Hardware config file")
 
     # Sweep command
@@ -52,8 +52,8 @@ def main():
 
     logger = setup_logger()
 
-    if args.command == "server":
-        from src.streaming.server import LSLServer
+    if args.command == "LSLserver":
+        from src.streaming.LSLserver import LSLServer
         config_path = Path(args.config)
         from src.utils.config import load_yaml
         config = load_yaml(config_path)

@@ -142,7 +142,7 @@ class EEGSweep:
         if not streams:
             logger.error("❌ Could not find LSL stream '%s'.", self.config.stream_name)
             logger.info("Please ensure your LSL server is running in another terminal:")
-            logger.info("python -m src.main server --config config/hardware/freeeeg.yaml")
+            logger.info("python -m src.main LSLserver -c config/hardware/freeeeg_only.yaml")
             sys.exit(1)
             
         self.inlet = StreamInlet(streams[0])

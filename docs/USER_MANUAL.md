@@ -7,7 +7,7 @@ Welcome to the **EEGsuite** user manual. This repository is a professional-grade
 ## 🏗 System Architecture
 
 The suite consists of three primary layers:
-1.  **Hardware & Streaming (`server`)**: Interfaces with EEG hardware (e.g., FreeEEG32) via BrainFlow and broadcasts data to the local network using **Lab Streaming Layer (LSL)**.
+1.  **Hardware & Streaming (`LSLserver`)**: Interfaces with EEG hardware (e.g., FreeEEG32) via BrainFlow and broadcasts data to the local network using **Lab Streaming Layer (LSL)**.
 2.  **Protocol & Recording (`sweep`)**: Connects to the LSL stream and an external stimulator (VHP device) to run automated experimental protocols.
 3.  **Visualization & Analysis (`analyze`)**: Processes recorded CSV/EDF files to generate research-ready plots and metrics.
 
@@ -113,7 +113,7 @@ This project follows strict academic standards:
 *   This is a BrainFlow warning. It is usually harmless and does not prevent data streaming.
 
 **"LSL stream not found"**
-*   Ensure the `server` command is running in a separate terminal before starting a `sweep`.
+*   Ensure the `LSLserver` command is running in a separate terminal before starting a `sweep`.
 
 **"Serial port permission denied"**
 *   Check that no other software (like Arduino IDE or a previous session) is holding the COM port open.

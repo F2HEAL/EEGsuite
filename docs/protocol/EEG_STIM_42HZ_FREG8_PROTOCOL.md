@@ -74,7 +74,7 @@ This protocol uses the **FreeEEG32** board and the **Tenocom 32ch Cap** mapped t
 
 ### 1. Start LSL Stream (Acquisition Node)
 ```powershell
-python -m src.main server -c .\config\hardware\freeeeg.yaml
+python -m src.main LSLserver -c .\config\hardware\freeeeg.yaml
 ```
 
 ### 2. Start Real-time Monitor (Visualization Node)
