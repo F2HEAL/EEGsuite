@@ -1,0 +1,46 @@
+# FREG9 9-Channel Montage
+# Mapping specific FreeEEG32 inputs to 10-20 locations
+# Unused channels are marked as 'NC' (Not Connected)
+# 
+# ⚡ REFERENCE: M1+M2 (linked)
+# ⚡ GND (VCM/Bias): Fpz or Fz
+name: FREG9
+montage: standard_1020
+channels: [
+    T7,   # CH1
+    C3,   # CH2
+    NC,   # CH3
+    NC,   # CH4
+    T8,   # CH5
+    FC4,  # CH6
+    NC,   # CH7
+    NC,   # CH8
+    FC3,  # CH9
+    C4,   # CH10
+    NC,   # CH11
+    NC,   # CH12
+    CP3,  # CH13
+    CP4,  # CH14
+    NC,   # CH15
+    NC,   # CH16
+    Cz,   # CH17
+    NC,   # CH18
+    NC, NC, NC, NC, NC, NC, 
+    NC, NC, NC, NC, NC, NC, 
+    NC
+]
+# Automatically pick only the valid channels for analysis
+pick_channels: [T7, C3, T8, FC4, FC3, C4, CP3, CP4, Cz, S1_left, S1_right]
+
+# Virtual channels for weighted Laplacian (S1 focus)
+# S1_left = C3 - (2*FC3 + 2*CP3 + Cz + T7) / 6
+# S1_right = C4 - (2*FC4 + 2*CP4 + Cz + T8) / 6
+virtual_channels:
+  S1_left:
+    base: C3
+    weights: {FC3: 2, CP3: 2, Cz: 1, T7: 1}
+    divisor: 6
+  S1_right:
+    base: C4
+    weights: {FC4: 2, CP4: 2, Cz: 1, T8: 1}
+    divisor: 6

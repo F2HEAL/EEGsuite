@@ -125,6 +125,8 @@ class EEGVisualizer:
                         logger.info("Loaded channel map from %s", profile_path.name)
                     if 'montage' in m_config:
                         self.config['montage'] = m_config['montage']
+                    if 'virtual_channels' in m_config:
+                        self.config['virtual_channels'] = m_config['virtual_channels']
                     # Apply specific picks if defined (like for FREG8)
                     # BUT: Only if the user hasn't already specified a manual pick in the main config
                     if 'pick_channels' in m_config and not self.config.get('manual_pick_override'):
@@ -175,6 +177,9 @@ class EEGVisualizer:
         # Add annotations
         self._add_annotations(timestamps, markers)
 
+        # Apply virtual channels (e.g. Laplacian) before picking
+        self._apply_virtual_channels()
+
         # Apply global channel picking
         picks = self.config.get('pick_channels')
         if picks:
@@ -182,6 +187,45 @@ class EEGVisualizer:
             if valid_picks:
                 self.raw.pick_channels(valid_picks)
                 logger.info("Global channel pick applied: %s", valid_picks)
+
+    def _apply_virtual_channels(self):
+        """Computes and adds virtual channels (e.g., Weighted Laplacian) from config."""
+        virtuals = self.config.get('virtual_channels')
+        if not virtuals or not self.raw:
+            return
+
+        for name, params in virtuals.items():
+            try:
+                base_ch = params.get('base')
+                weights = params.get('weights', {})
+                divisor = params.get('divisor', 1.0)
+
+                if base_ch not in self.raw.ch_names:
+                    logger.warning("Base channel %s for virtual channel %s not found. Skipping.", base_ch, name)
+                    continue
+
+                # Get data for base channel
+                base_data = self.raw.get_data(picks=[base_ch])[0]
+                
+                # Compute weighted average of reference channels
+                ref_sum = np.zeros_like(base_data)
+                for ref_ch, weight in weights.items():
+                    if ref_ch in self.raw.ch_names:
+                        ref_sum += self.raw.get_data(picks=[ref_ch])[0] * weight
+                    else:
+                        logger.warning("Ref channel %s for virtual channel %s not found. Skipping weight.", ref_ch, name)
+                
+                # Laplacian = Base - (WeightedSum / Divisor)
+                virtual_data = base_data - (ref_sum / divisor)
+                
+                # Add to Raw object
+                info = mne.create_info([name], self.raw.info['sfreq'], ch_types=['eeg'])
+                new_raw = mne.io.RawArray(virtual_data[np.newaxis, :], info)
+                self.raw.add_channels([new_raw], force_update_info=True)
+                logger.info("Created virtual channel: %s", name)
+
+            except Exception as e:
+                logger.error("Failed to create virtual channel %s: %s", name, e)
 
     def _add_annotations(self, timestamps, markers):
         valid_mask = ~np.isnan(markers)

@@ -1,6 +1,9 @@
 # FREG8 8-Channel Montage
 # Mapping specific FreeEEG32 inputs to 10-20 locations
 # Unused channels are marked as 'NC' (Not Connected)
+# 
+# ⚡ REFERENCE: M1+M2 (linked)
+# ⚡ GND (VCM/Bias): Fpz or Fz
 name: FREG8
 montage: standard_1020
 channels: [
