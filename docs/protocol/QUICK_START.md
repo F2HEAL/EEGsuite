@@ -48,7 +48,7 @@ Run this on the PC connected to the EEG board.
 python -m src.main LSLserver -c config/hardware/freeeeg_only.yaml
 
 # Start with a montage to broadcast electrode names (e.g., F3, F4) via LSL metadata
-python -m src.main LSLserver -c config/hardware/freeeeg_only.yaml -m config/montages/freg8.yaml
+python -m src.main LSLserver -c config/hardware/freeeeg_only.yaml -m config/montages/freg9.yaml
 ```
 *   **Verify**: Wait for the message `* LSL stream 'BrainFlowEEG' is now active`.
 
@@ -63,18 +63,25 @@ python src/utils/lsl-tools-1/lsl_stream_analyser.py
 *   **Metadata**: Verify that electrode labels (if using `-m` in step 2) are correctly displayed in the "CHANNEL NAMES" section.
 
 ## 3.b Start Real-time Monitor (Visualization Node)
-Run this on the 'EEG Visualization PC' from the [EEGlslviewer](https://github.com/F2HEAL/EEGlslviewer) repository to monitor signal quality.
+Run this on the 'EEG Visualization PC' to monitor EEG signal quality in real-time. The viewer provides live metrics (PTP, RMS, Line Noise Ratio, Muscle Ratio) and supports virtual channels.
+
+### Recommended (YAML-based)
+Uses YAML montage files for flexible channel mapping and virtual channel calculations (e.g., Laplacian referencing).
 
 ```bash
-python eeg_viewer_main.py
-```
-*   **Default**: Connects to the "BrainFlowEEG" LSL stream. 
-*   **Custom**: To specify a different stream name, use: `python eeg_viewer_main.py --lsl-stream "YourStreamName"`
+# Connect to default stream 'BrainFlowEEG' using a montage
+python src/analysis/realtime/EEGlslviewer/src/eeg_viewer_main_yaml.py --config config/montages/freg9.yaml
 
-NEW!
-```bash
-python src/eeg_viewer_main_yaml.py --config src/modules/freg9.yaml --lsl-stream BrainFlowEEG
+# Connect to a custom LSL stream name or ID
+python src/analysis/realtime/EEGlslviewer/src/eeg_viewer_main_yaml.py --config config/montages/freg9.yaml --lsl-stream "YourStreamName"
 ```
+
+### Legacy (Fixed Config) [Obsolete]
+Uses `src/modules/config_channels.py` for fixed channel mapping.
+```bash
+python src/analysis/realtime/EEGlslviewer/src/eeg_viewer_main.py
+```
+
 
 ## 4. Run Experiment (Control Node)
 Run this on the PC connected to the VHP Stimulator.
