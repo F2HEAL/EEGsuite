@@ -59,16 +59,18 @@ class YamlGraphController:
         name_to_hw_idx = {}
         
         # BrainFlow EXG channels for this board
-        try:
-            bf_exg_channels = BoardShim.get_exg_channels(self.board_id)
-        except Exception:
-            # Fallback for LSL or unsupported boards
-            logging.warning(f"Could not get EXG channels for board {self.board_id}, using fallback mapping")
+        if self.board_id in [BoardIds.STREAMING_BOARD, BoardIds.PLAYBACK_FILE_BOARD, -2]:
+            # LSL or playback boards don't have static EXG channel lists
             if hasattr(self.board_shim, 'num_channels'):
-                # LSLBoard maps channels to rows 1..N
                 bf_exg_channels = list(range(1, self.board_shim.num_channels + 1))
             else:
-                # Last resort: just use sequential indices starting from 1
+                bf_exg_channels = list(range(1, len(all_channels) + 1))
+        else:
+            try:
+                bf_exg_channels = BoardShim.get_exg_channels(self.board_id)
+            except Exception:
+                # Fallback for other unsupported boards
+                logging.warning(f"Could not get EXG channels for board {self.board_id}, using fallback mapping")
                 bf_exg_channels = list(range(1, len(all_channels) + 1))
         
         for i, name in enumerate(all_channels):

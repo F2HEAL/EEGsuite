@@ -3,6 +3,7 @@
 Handles EEG data plotting, PSD calculation, and real-time updates.
 """
 import numpy as np
+import logging
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QScrollArea, QCheckBox
 import pyqtgraph as pg
@@ -81,7 +82,7 @@ class PlotManager:
         self.channel_widgets = []
 
         self.pens = [pg.mkPen(c, width=2) for c in ['#A54E4E', '#A473B6', '#5B45A4', '#2079D2', '#32B798', '#2FA537', '#9DA52F', '#A57E2F']]
-        print("EXG channel list:", self.exg_channels)
+        logging.debug("EXG channel list: %s", self.exg_channels)
 
         for i in range(len(self.exg_channels)):
             if self.channel_names:
