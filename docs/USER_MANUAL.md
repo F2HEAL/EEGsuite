@@ -20,6 +20,11 @@ For specific electrode placement used in the KULLAB measurements, see the [KULLA
 For the 8-channel motor cortex montage, see the [FREG8 Montage Documentation](MONTAGE_FREG8.md).
 For the 9-channel FREG9 montage, see the [FREG9 Montage Documentation](MONTAGE_FREG9.md).
 
+### 🔄 Data Flow Structure
+
+![Data Flow Structure](assets/EEGSuite%20overview.jpg)
+*High-level overview of the EEGsuite data flow and components.*
+
 The hardware setup is designed for maximum signal purity and participant safety:
 
 *   **Acquisition Node (Left)**: The FreeEEG32 is battery-powered (3x1.5V AA) and connected via a USB Isolator. The acquisition laptop should ideally run on DC power (battery) to eliminate 50/60Hz mains interference.
