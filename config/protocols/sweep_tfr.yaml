@@ -1,0 +1,30 @@
+Channel:
+  Start: 5  
+  End: 5
+  Steps: 1
+
+# Ch 6 = TACTOR 1 for FOT
+# Ch 5 = TACTOR 2 for IFNFN (REMOVED NIPPLE)
+
+
+Volume:
+  Start: 100     
+  End: 100
+  Steps: 10
+
+Frequency:
+  Start: 42
+  End: 42
+  Steps: 2
+
+# See docs\protocol\42Hz test stim freq why.md for why 42 Hz.
+
+Baselines:
+  Baseline_1: 3
+  Baseline_2: 4
+  Baseline_3: 5
+
+Measurements:
+  Number: 3
+  Duration_on: 1
+  Duration_off: 0.5

@@ -44,7 +44,7 @@ This guide provides a step-by-step walkthrough for preparing, running, and analy
 ```
 
 4.  **Configuration**:
-    *   Edit `config/hardware/freeeeg.yaml`.
+    *   Edit `config/hardware/freeeeg_only.yaml`.
     *   Update `Board: Serial` and `VHP: Serial` to match your noted ports (e.g., `COM3` on Windows or `/dev/ttyUSB0` on Linux).
 
 ## 2. Start LSL Stream (Acquisition Node)
@@ -64,10 +64,15 @@ Before starting the experiment, verify the LSL stream metadata and timing stabil
 
 ```bash
 # Run the analyzer from the project root
-python src/utils/lsl-tools-1/lsl_stream_analyser.py
+    python src/utils/lsl-tools-1/lsl_stream_analyser.py
 ```
 *   **Check**: Ensure "Timing quality" is `Excellent` or `Good`.
+                Stability assessment: Excellent (laboratory grade)
 *   **Metadata**: Verify that electrode labels (if using `-m` in step 2) are correctly displayed in the "CHANNEL NAMES" section.
+
+🎉 Stream connection successful!
+Channel names: ['T7', 'C3', 'NC', 'NC', 'T8', 'FC4', 'NC', 'NC', 'FC3', 'C4', 'NC', 'NC', 'CP3', 'CP4', 'NC', 'NC', 'Cz', 'NC', 'NC', 'NC', 'NC', 'NC', 'NC', 'NC', 'NC', 'NC', 'NC', 'NC', 'NC', 'NC', 'NC', 'Channel 31']
+
 
 ## 3.b Start Real-time Monitor (Visualization Node)
 Run this on the 'EEG Visualization PC' to monitor EEG signal quality in real-time. The viewer provides live metrics (PTP, RMS, Line Noise Ratio, Muscle Ratio) and supports virtual channels.
@@ -92,6 +97,10 @@ python src/analysis/realtime/EEGlslviewer/src/eeg_viewer_main.py
 
 ## 4. Run Experiment (Control Node)
 Run this on the PC connected to the VHP Stimulator.
+
+```bash
+python -m src.main sweep -d config/hardware/vbs_only.yaml -p config/protocols/sweep_default.yaml
+```
 
 ```bash
 python -m src.main sweep -d config/hardware/freeeeg.yaml -p config/protocols/sweep_default.yaml
