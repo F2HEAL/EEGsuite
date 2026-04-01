@@ -95,6 +95,9 @@ python -m src.main sweep -d config/hardware/freeeeg.yaml -p config/protocols/swe
 ## 5. Analyze Data (Post-Processing)
 Generate HTML reports and plots from the recorded CSV files.
 
+### 5.1 General Analysis (Standard Report)
+Used for single-file analysis to inspect signal quality, PSD, and spectrograms.
+
 ```bash
 # Example: Analyze a specific file from start (0s) to 60s
 python -m src.main analyze -f "data/raw/YOUR_FILE_NAME.csv" -s 0 -d 60
@@ -104,6 +107,21 @@ python -m src.main analyze -f "data/raw/YOUR_FILE_NAME.csv" -s 0 -d 60
 *   **Montage Switching**: To change electrode layouts (e.g., from 32-channel to 8-channel), change the `montage_profile` in `config/analysis/default_offline.yaml`.
     *   `kullab`: Standard 32-channel layout.
     *   `freg8`: Sparse 8-channel motor layout.
+    *   `freg9`: High-SNR 9-channel motor layout.
 *   **Channel Picking**: You can manually override which channels appear in the report by editing the `pick_channels` list in `config/analysis/default_offline.yaml`.
     *   If `pick_channels` is defined in the main YAML, it takes priority over the montage profile's defaults.
     *   This affects all plots: Timeseries, Spectrograms, PSD, and ERPs.
+
+### 5.2 TFR Contrast Analysis (EM Artifact Removal)
+Used to isolate neural responses from electromagnetic (EM) interference (e.g., from tactile stimulators) by subtracting a noise-only condition from the task condition.
+
+*   **FOT (Finger-On-Tactor)**: Task condition (Neural + EM + Noise).
+*   **IFNFN (In-Field-No-Feeling-Nipple)**: Noise-only condition (EM + Noise).
+
+```bash
+# Run the contrast analysis on two files
+python -m src.main contrast --fot data/raw/SUBJECT_FOT.csv --ifnfn data/raw/SUBJECT_IFNFN.csv
+```
+*   **Result**: Generates a high-precision HTML report in `reports/` containing TFR heatmaps for FOT, IFNFN, and the final **Contrast** ($FOT - IFNFN$).
+*   **Markers**: Requires files recorded with condition-aware markers (1xx for FOT, 2xx for IFNFN).
+*   **Reference**: See `docs/ANALYSIS_TFR_CONTRAST.md` for more details on the 4-step pipeline.
