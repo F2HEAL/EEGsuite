@@ -161,7 +161,7 @@ python -m src.analysis.offline.tfr_contrast \
 ```
 
 ```bash
-python -m src.analysis.offline.tfr_contrast --fot data\raw\260401-1926_None_c5_f32_v100.csv --ifnfn data\raw\260401-2116_None_c5_f42_v100.csv --config config/analysis/contrast_offline.yaml
+python -m src.analysis.offline.tfr_contrast --fot data\raw\260401-2201_None_c6_f42_v100.csv --ifnfn data\raw\260401-2202_None_c5_f42_v100.csv --config config/analysis/default_offline.yaml
 ```
 ---
 

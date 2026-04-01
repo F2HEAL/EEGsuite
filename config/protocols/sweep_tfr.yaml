@@ -6,7 +6,6 @@ Channel:
 # Ch 6 = TACTOR 1 for FOT
 # Ch 5 = TACTOR 2 for IFNFN (REMOVED NIPPLE)
 
-
 Volume:
   Start: 100     
   End: 100
@@ -25,6 +24,6 @@ Baselines:
   Baseline_3: 5
 
 Measurements:
-  Number: 3
-  Duration_on: 1
-  Duration_off: 0.5
+  Number: 3 # should be 50-100, 3 is for testing
+  Duration_on: 5
+  Duration_off: 2

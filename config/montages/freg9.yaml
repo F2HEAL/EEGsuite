@@ -27,7 +27,7 @@ channels: [
     NC,   # CH18
     NC, NC, NC, NC, NC, NC, 
     NC, NC, NC, NC, NC, NC, 
-    NC
+    NC, NC
 ]
 # Automatically pick only the valid channels for analysis
 pick_channels: [T7, C3, T8, FC4, FC3, C4, CP3, CP4, Cz, S1_left, S1_right]
