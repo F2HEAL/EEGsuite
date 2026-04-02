@@ -4,6 +4,7 @@ import time
 import numpy as np
 import sys
 import argparse
+from pathlib import Path
 
 # Default stream name if not specified via command line
 DEFAULT_STREAM_NAME = "BrainFlowEEG"
@@ -33,23 +34,23 @@ def debug_lsl_stream(stream_name=DEFAULT_STREAM_NAME):
     target_streams = [s for s in streams if s.name() == stream_name]
     
     if not target_streams:
-        print(f"\n❌ Stream '{stream_name}' not found!")
+        print(f"\n[!] Stream '{stream_name}' not found!")
         print("Available streams:")
         for stream in streams:
             print(f"  - {stream.name()} (type: {stream.type()})")
         return False, None, None
     
-    print(f"\n✅ Found target stream: {stream_name}")
+    print(f"\nFound target stream: {stream_name}")
     stream = target_streams[0]
     
     # Create inlet to get FULL metadata
     try:
         inlet = StreamInlet(stream)
-        print("✓ StreamInlet created successfully")
+        print("StreamInlet created successfully")
         
         # Get complete stream info
         info = inlet.info()
-        print(f"\n📊 COMPLETE STREAM METADATA:")
+        print(f"\nCOMPLETE STREAM METADATA:")
         print(f"  Name: {info.name()}")
         print(f"  Type: {info.type()}")
         print(f"  Channel Count: {info.channel_count()}")
@@ -62,7 +63,7 @@ def debug_lsl_stream(stream_name=DEFAULT_STREAM_NAME):
         print(f"  Session ID: {info.session_id()}")
         
         # Channel-specific information
-        print(f"\n🎛️  CHANNEL INFORMATION:")
+        print(f"\nCHANNEL INFORMATION:")
         desc = info.desc()
         channels = desc.child("channels")
         if channels.empty():
@@ -85,7 +86,7 @@ def debug_lsl_stream(stream_name=DEFAULT_STREAM_NAME):
                 ch_idx += 1
         
         # Stream description/metadata
-        print(f"\n📋 STREAM DESCRIPTION:")
+        print(f"\nSTREAM DESCRIPTION:")
         if not desc.empty():
             # Try to get various description fields
             for field in ["manufacturer", "model", "subject", "session", "experiment"]:
@@ -96,7 +97,7 @@ def debug_lsl_stream(stream_name=DEFAULT_STREAM_NAME):
                         print(f"  {field.capitalize()}: {value.value()}")
         
         # Get channel names if available
-        print(f"\n🔤 CHANNEL NAMES:")
+        print(f"\nCHANNEL NAMES:")
         ch_names = []
         channels = desc.child("channels")
         if not channels.empty():
@@ -114,30 +115,30 @@ def debug_lsl_stream(stream_name=DEFAULT_STREAM_NAME):
             ch_names = [f"Channel_{i+1}" for i in range(info.channel_count())]
         
         # Get a sample to verify data flow
-        print(f"\n📥 TESTING DATA FLOW:")
+        print(f"\nTESTING DATA FLOW:")
         sample, timestamp = inlet.pull_sample(timeout=5.0)
         if sample:
-            print(f"✓ Received sample with {len(sample)} channels")
+            print(f"Received sample with {len(sample)} channels")
             print(f"  First few values: {sample[:5]}")
             print(f"  Timestamp: {timestamp}")
             
             # Test multiple samples
-            print(f"\n🔄 TESTING CONTINUOUS DATA:")
+            print(f"\nTESTING CONTINUOUS DATA:")
             samples, timestamps = inlet.pull_chunk(timeout=2.0, max_samples=10)
             if samples:
-                print(f"✓ Received {len(samples)} samples in chunk")
+                print(f"Received {len(samples)} samples in chunk")
                 print(f"  Sample shape: {len(samples)}x{len(samples[0])}")
                 print(f"  Timestamps range: {timestamps[0]:.3f} to {timestamps[-1]:.3f}")
             else:
-                print("❌ No chunk data received")
+                print("[!] No chunk data received")
                 
             return True, info, ch_names
         else:
-            print("❌ No sample received within timeout")
+            print("[!] No sample received within timeout")
             return False, None, None
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[!] Error: {e}")
         import traceback
         traceback.print_exc()
         return False, None, None
@@ -182,7 +183,7 @@ def analyze_sample_rate_drift(timestamps, nominal_rate, duration):
 
 def print_stream_statistics(stream_name=DEFAULT_STREAM_NAME, duration=10):
     """Collect and print stream statistics over time with proper timing."""
-    print(f"\n📈 COLLECTING STATISTICS FOR {duration} SECONDS:")
+    print(f"\nCOLLECTING STATISTICS FOR {duration} SECONDS:")
     
     target_streams = [s for s in resolve_streams() if s.name() == stream_name]
     if not target_streams:
@@ -237,7 +238,7 @@ def print_stream_statistics(stream_name=DEFAULT_STREAM_NAME, duration=10):
         
         # Analyze sample rate drift if we have enough timestamps
         if len(all_timestamps) >= 100:  # Need reasonable number of samples for meaningful analysis
-            print(f"\n🎯 SAMPLE RATE DRIFT ANALYSIS:")
+            print(f"\nSAMPLE RATE DRIFT ANALYSIS:")
             drift_stats = analyze_sample_rate_drift(all_timestamps, nominal_rate, actual_duration)
             
             if 'error' not in drift_stats:
@@ -246,7 +247,7 @@ def print_stream_statistics(stream_name=DEFAULT_STREAM_NAME, duration=10):
                 print(f"  Total drift: {drift_stats['total_drift_seconds']:+.6f} seconds")
                 print(f"  Drift rate: {drift_stats['drift_ppm']:+.1f} ppm")
                 print(f"  Drift per minute: {drift_stats['drift_per_minute']:+.3f} seconds")
-                print(f"  Instantaneous rate: {drift_stats['instantaneous_rates_mean']:.2f} ± {drift_stats['instantaneous_rates_std']:.2f} Hz")
+                print(f"  Instantaneous rate: {drift_stats['instantaneous_rates_mean']:.2f} +/- {drift_stats['instantaneous_rates_std']:.2f} Hz")
                 print(f"  Rate range: {drift_stats['instantaneous_rates_min']:.1f} - {drift_stats['instantaneous_rates_max']:.1f} Hz")
                 print(f"  Interval jitter: {drift_stats['jitter_ms']:.3f} ms RMS")
                 print(f"  Interval CV: {drift_stats['intervals_cv']:.2f}%")
@@ -264,7 +265,7 @@ def print_stream_statistics(stream_name=DEFAULT_STREAM_NAME, duration=10):
 
 def test_stream_performance(stream_name=DEFAULT_STREAM_NAME, test_duration=5):
     """Alternative performance test with more detailed metrics."""
-    print(f"\n⚡ PERFORMANCE TEST FOR {test_duration} SECONDS:")
+    print(f"\nPERFORMANCE TEST FOR {test_duration} SECONDS:")
     
     target_streams = [s for s in resolve_streams() if s.name() == stream_name]
     if not target_streams:
@@ -305,7 +306,7 @@ def test_stream_performance(stream_name=DEFAULT_STREAM_NAME, test_duration=5):
         print(f" {samples_received} samples, {results[interval]['samples_per_sec']:.1f} samples/sec")
     
     # Print summary
-    print(f"\n📊 PERFORMANCE SUMMARY:")
+    print(f"\nPERFORMANCE SUMMARY:")
     for interval, result in results.items():
         drift_info = ""
         if result['drift_stats'] and 'error' not in result['drift_stats']:
@@ -317,7 +318,7 @@ def test_stream_performance(stream_name=DEFAULT_STREAM_NAME, test_duration=5):
 
 def measure_sample_rate_drift(stream_name=DEFAULT_STREAM_NAME, measurement_duration=30):
     """Comprehensive sample rate drift measurement over longer duration."""
-    print(f"\n🎯 COMPREHENSIVE SAMPLE RATE DRIFT MEASUREMENT ({measurement_duration}s):")
+    print(f"\nCOMPREHENSIVE SAMPLE RATE DRIFT MEASUREMENT ({measurement_duration}s):")
     
     target_streams = [s for s in resolve_streams() if s.name() == stream_name]
     if not target_streams:
@@ -345,7 +346,7 @@ def measure_sample_rate_drift(stream_name=DEFAULT_STREAM_NAME, measurement_durat
     if len(all_timestamps) >= 100:
         drift_stats = analyze_sample_rate_drift(all_timestamps, nominal_rate, actual_duration)
         
-        print(f"\n📊 DRIFT MEASUREMENT RESULTS:")
+        print(f"\nPERFORMANCE MEASUREMENT RESULTS:")
         print(f"  Samples collected: {len(all_timestamps)}")
         print(f"  Measurement duration: {actual_duration:.2f} seconds")
         print(f"  Nominal sample rate: {drift_stats['nominal_rate']} Hz")
@@ -396,13 +397,21 @@ if __name__ == "__main__":
     # Setup file logging
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     log_filename = f"lsl_stream_analysis_{stream_name.replace(' ', '_')}_{timestamp}.txt"
-    sys.stdout = Logger(log_filename)
+    
+    # Path logic to write to /reports relative to the project root
+    # File is at: src/utils/lsl-tools-1/lsl_stream_analyser.py
+    project_root = Path(__file__).resolve().parent.parent.parent.parent
+    report_dir = project_root / "reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    log_path = report_dir / log_filename
+    
+    sys.stdout = Logger(str(log_path))
     
     try:
         success, stream_info, channel_names = debug_lsl_stream(stream_name)
         
         if success:
-            print(f"\n🎉 Stream connection successful!")
+            print(f"\nStream connection successful!")
             print(f"Channel names: {channel_names}")
             
             # Collect basic statistics with drift analysis
@@ -416,7 +425,7 @@ if __name__ == "__main__":
             print("\n" + "="*50)
             measure_sample_rate_drift(stream_name, measurement_duration=10)
         else:
-            print(f"\n💥 Failed to connect to stream")
+            print(f"\nFailed to connect to stream")
             
     finally:
         # Restore stdout and close file
@@ -424,4 +433,4 @@ if __name__ == "__main__":
             output_path = sys.stdout.log.name
             sys.stdout.log.close()
             sys.stdout = sys.stdout.terminal
-            print(f"\n📝 Full debug log saved to: {output_path}")
+            print(f"\nFull debug log saved to: {output_path}")
