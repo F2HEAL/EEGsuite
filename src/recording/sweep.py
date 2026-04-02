@@ -232,9 +232,13 @@ class EEGSweep:
         if not self.vhp or not self.vhp.is_connected():
             logger.info("Recording Baseline 1 (Waiting for VHP ON)...")
             b1_path = RAW_DATA_DIR / f"{self.timestamp}_{self.config.board_id}_baseline_VHP_OFF.csv"
+            
+            # Use duration from config if available, fallback to 10s
+            b1_dur = float(p.get("Baselines", {}).get("Baseline_1", 10.0))
+            
             with open(b1_path, "w", newline="") as f:
                 writer = csv.writer(f)
-                self.record_to_csv(10.0, writer, marker=3)
+                self.record_to_csv(b1_dur, writer, marker=3)
             
             while not self.vhp or not self.vhp.is_connected():
                 logger.info("Waiting for VHP to be detected on %s...", self.config.serial_port)

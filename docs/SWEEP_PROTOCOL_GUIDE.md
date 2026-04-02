@@ -33,7 +33,7 @@ The protocol begins with three critical baseline measurements to calibrate the e
 - **Procedure**: EEG recording starts *before* the VHP board is powered ON or while it is disconnected.
 - **Purpose**: Captures the ambient electrical noise floor of the room and the acquisition system.
 - **Marker**: `3`
-- **Duration**: 10 seconds.
+- **Duration**: Defined in protocol YAML (`Baselines: Baseline_1`), defaulting to 10 seconds.
 
 ### 2️⃣ Baseline 2: EM Artifact Template (NO CONTACT)
 - **Manual Def**: `Baseline_2` (In-Field-Not-Feeling-Nipple / IFNFN)
