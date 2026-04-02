@@ -35,7 +35,7 @@ The FreeEEG32 inputs are mapped as follows. Unused channels should be left float
 | **CH13** | CP3 |
 | **CH14** | CP4 |
 | CH15-16 | *NC* |
-| **CH17** | **Cz** |
+| **CH17** | Cz |
 | CH18-32 | *NC* |
 
 ## ⚡ Reference & VCM_Bias
