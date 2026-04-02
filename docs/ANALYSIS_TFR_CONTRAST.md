@@ -27,6 +27,7 @@ The module processes the EEG data through four distinct stages:
 
 1.  **Full Time–Frequency Transform**: Uses Morlet wavelets to decompose the continuous signal into power across both time and frequency.
 2.  **Epoching**: Data is sliced into "trials" around the stimulation triggers, including safety margins.
+    ![Epoch Time Window](assets/TFR%20step2%20Epoch%20Time%20Window.png)
 3.  **Baseline Normalization**: Each trial is normalized against its own pre-stimulus rest period (supports dB, log-ratio, or percent change).
 4.  **Condition Contrasting**: The normalized IFNFN trials are subtracted from the FOT trials to produce the final contrast map.
 
