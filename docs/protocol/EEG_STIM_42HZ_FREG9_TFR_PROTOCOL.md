@@ -92,7 +92,7 @@ python -m src.main LSLserver -c .\config\hardware\freeeeg.yaml
 ### 2. Start Real-time Monitor (Visualization Node)
 Verify signal quality (look for clean baseline, no excessive 50Hz noise).
 ```powershell
-python eeg_viewer_main.py
+python src/analysis/realtime/EEGlslviewer/src/eeg_viewer_main.py
 ```
 
 ---
