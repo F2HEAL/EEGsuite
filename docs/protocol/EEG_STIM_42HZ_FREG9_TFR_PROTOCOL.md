@@ -69,7 +69,7 @@ This protocol uses the **FreeEEG32** board and the **Tenocom 32ch Cap** mapped t
 
 ### A. Environment & Hardware
 1.  **Shut down** non-essential electronic devices.
-2.  **Connect** FreeEEG32 to the Acquisition PC and VBS Stimulator to the Control PC.
+2.  **Connect** FreeEEG32 to the Acquisition PC and VBS Stimulator to the Control PC, attach 3x1.5V battery pack
 3.  **Verify COM Ports** in Windows Device Manager.
 4.  **Update Config:** Edit `.\config\hardware\freeeeg_only.yaml` and `.\config\hardware\vbs_only.yaml` with correct serial ports.
 
@@ -92,7 +92,7 @@ python -m src.main LSLserver -c .\config\hardware\freeeeg.yaml
 ### 2. Start Real-time Monitor (Visualization Node)
 Verify signal quality (look for clean baseline, no excessive 50Hz noise).
 ```powershell
-python eeg_viewer_main.py
+python src/analysis/realtime/EEGlslviewer/src/eeg_viewer_main.py
 ```
 
 ---
