@@ -34,7 +34,7 @@ def main():
 
     # Analyze command
     analyze_parser = subparsers.add_parser("analyze", help="Analyze recorded data")
-    analyze_parser.add_argument("-f", "--file", type=str, required=True, help="CSV file to analyze")
+    analyze_parser.add_argument("-f", "--file", type=str, required=True, help="MNE RAW file to analyze")
     analyze_parser.add_argument("-c", "--config", type=str, help="Analysis YAML config file")
     analyze_parser.add_argument("-s", "--start", type=float, default=0.0, help="Start time (sec)")
     analyze_parser.add_argument("-d", "--duration", type=float, default=60.0, help="Duration (sec)")

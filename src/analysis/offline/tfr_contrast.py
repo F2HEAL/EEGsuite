@@ -232,13 +232,13 @@ class TFRContrastAnalyzer:
         self._apply_picks(self.raw_fot)
         self._apply_picks(self.raw_ifnfn)
 
-    def load_single_file(self, csv_path: Path) -> None:
+    def load_single_file(self, raw_path: Path) -> None:
         """
         Load a single CSV that contains interleaved FOT/IFNFN trials
         (alternating or randomized protocol).  Condition is determined
         by marker codes 101/201.
         """
-        raw = load_csv_to_raw(csv_path, self.cfg.channels, self.cfg.montage)
+        raw = mne.io.read_raw_fif(raw_path, preload=True)
         self._apply_virtual_channels(raw)
         self._apply_picks(raw)
         # Both conditions share the same Raw — epoching separates them
