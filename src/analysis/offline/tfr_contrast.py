@@ -197,96 +197,6 @@ class TFRContrastConfig:
 
 
 # ---------------------------------------------------------------------------
-# Helper: load CSV into MNE Raw
-# ---------------------------------------------------------------------------
-EEG_CHANNELS_COUNT = 32
-
-
-def load_csv_to_raw(
-    csv_path: Path,
-    channels: List[str],
-    montage_name: str,
-) -> mne.io.RawArray:
-    """
-    Load a sweep CSV (timestamp, 32×EEG, marker) into an MNE RawArray
-    with annotations derived from markers.
-    """
-    df = pd.read_csv(csv_path, header=None)
-
-    timestamps = df.iloc[:, 0].values
-    eeg_data = df.iloc[:, 1 : EEG_CHANNELS_COUNT + 1].values.T  # (ch, samples)
-    markers = df.iloc[:, EEG_CHANNELS_COUNT + 1].values
-
-    # Sampling frequency from median ISI
-    if len(timestamps) > 1:
-        sfreq = 1.0 / np.median(np.diff(timestamps))
-    else:
-        sfreq = 512.0
-
-    # Channel names — pad or trim to 32, deduplicate "NC" entries
-    ch_names = list(channels)
-    if len(ch_names) < EEG_CHANNELS_COUNT:
-        ch_names += [f"NC{i}" for i in range(len(ch_names), EEG_CHANNELS_COUNT)]
-    ch_names = ch_names[:EEG_CHANNELS_COUNT]
-
-    # MNE requires unique channel names — rename duplicate "NC" entries
-    nc_counter = 0
-    for i, name in enumerate(ch_names):
-        if name == "NC":
-            ch_names[i] = f"NC{nc_counter}"
-            nc_counter += 1
-
-    info = mne.create_info(ch_names=ch_names, sfreq=sfreq, ch_types="eeg")
-    raw = mne.io.RawArray(eeg_data, info, verbose=False)
-
-    # Drop NC channels
-    nc_chans = [ch for ch in raw.ch_names if ch.startswith("NC")]
-    if nc_chans:
-        raw.drop_channels(nc_chans)
-
-    # Set standard montage
-    try:
-        montage = mne.channels.make_standard_montage(montage_name)
-        raw.set_montage(montage, on_missing="warn")
-    except Exception as exc:
-        logger.warning("Could not apply montage '%s': %s", montage_name, exc)
-
-    # Build annotations from marker column
-    valid_mask = pd.to_numeric(pd.Series(markers), errors="coerce").notna()
-    marker_vals = pd.to_numeric(pd.Series(markers), errors="coerce").values
-
-    if np.any(valid_mask):
-        idxs = np.where(valid_mask)[0]
-        onsets = timestamps[idxs] - timestamps[0]
-        descriptions = [
-            MARKER_MAP.get(float(marker_vals[i]), f"Event_{int(marker_vals[i])}")
-            for i in idxs
-        ]
-        annots = mne.Annotations(
-            onset=onsets,
-            duration=[0.01] * len(onsets),
-            description=descriptions,
-        )
-        raw.set_annotations(annots)
-        logger.info(
-            "Loaded %s: %d samples @ %.1f Hz, %d annotations",
-            csv_path.name,
-            raw.n_times,
-            sfreq,
-            len(annots),
-        )
-    else:
-        logger.info(
-            "Loaded %s: %d samples @ %.1f Hz (no markers found)",
-            csv_path.name,
-            raw.n_times,
-            sfreq,
-        )
-
-    return raw
-
-
-# ---------------------------------------------------------------------------
 # Core analysis class
 # ---------------------------------------------------------------------------
 class TFRContrastAnalyzer:
@@ -312,14 +222,8 @@ class TFRContrastAnalyzer:
     def load_two_files(self, fot_path: Path, ifnfn_path: Path) -> None:
         """Load separate FOT and IFNFN recordings (fully-blocked protocol)."""
         logger.info("Loading FOT file: %s", fot_path)
-        # self.raw_fot = load_csv_to_raw(
-        #     fot_path, self.cfg.channels, self.cfg.montage
-        # )
         self.raw_fot = mne.io.read_raw_fif(fot_path, preload=True)
         logger.info("Loading IFNFN file: %s", ifnfn_path)
-        # self.raw_ifnfn = load_csv_to_raw(
-        #     ifnfn_path, self.cfg.channels, self.cfg.montage
-        # )
         self.raw_ifnfn = mne.io.read_raw_fif(ifnfn_path, preload=True)
         # Apply virtual channels (e.g. Weighted Laplacian) before picking
         self._apply_virtual_channels(self.raw_fot)
