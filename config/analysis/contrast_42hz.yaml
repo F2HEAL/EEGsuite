@@ -6,7 +6,7 @@ fmax: 220.0
 notch_freqs: [50, 100]
 
 # Stimulation frequency under analysis
-stim_freq: 84.0
+stim_freq: 42.0
 
 # TFR frequency range - up to just below Nyquist (256 Hz)
 tfr_fmin: 1.0

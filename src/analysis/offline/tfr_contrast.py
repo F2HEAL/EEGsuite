@@ -297,7 +297,7 @@ class TFRContrastAnalyzer:
         if picks:
             valid = [ch for ch in picks if ch in raw.ch_names]
             if valid:
-                raw.pick_channels(valid)
+                raw.pick(valid)
                 logger.info("Picked channels: %s", valid)
 
     # ------------------------------------------------------------------
@@ -552,20 +552,28 @@ class TFRContrastAnalyzer:
     def _stim_freq_line(self, ax, orientation: str = "horizontal") -> None:
         """Draw a dashed line at the stimulation frequency on TFR heatmaps."""
         sf = self.cfg.stim_freq
-        if orientation == "horizontal":
-            ax.axhline(sf, color="#F59E0B", linestyle="--", linewidth=0.9, alpha=0.7)
-            ax.text(
-                ax.get_xlim()[1],
-                sf,
-                f" {sf:.0f} Hz",
-                fontsize=7,
-                va="center",
-                ha="left",
-                color="#F59E0B",
-                fontweight="bold",
-                alpha=0.8,
-                clip_on=False,
-            )
+        last_sf = int(self.cfg.tfr_fmax / self.cfg.stim_freq) + 1
+        for i in range(1, last_sf):
+            if i > 1:
+                color = "#CC3300"
+            else:
+                color = "#F59E0B"
+            if orientation == "horizontal":
+                ax.axhline(
+                    i * sf, color=color, linestyle="--", linewidth=0.9, alpha=0.7
+                )
+                ax.text(
+                    ax.get_xlim()[1],
+                    i * sf,
+                    f" {i * sf:.0f} Hz",
+                    fontsize=7,
+                    va="center",
+                    ha="left",
+                    color=color,
+                    fontweight="bold",
+                    alpha=0.8,
+                    clip_on=False,
+                )
 
     def plot_tfr(
         self,
