@@ -8,8 +8,8 @@ Reads protocol and hardware config from YAML files and delivers stimulation patt
 No EEG data collection, no CSV output, no user prompts.
 
 Usage:
-    python -m src.recording.sweep_only \
-        --protocol config/protocols/sweep_only_default.yaml \
+    python -m src.recording.sweep_only `
+        --protocol config/protocols/sweep_only_default.yaml `
         --hardware config/hardware/vbs_only.yaml
 """
 
