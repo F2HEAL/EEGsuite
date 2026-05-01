@@ -27,8 +27,6 @@ Usage (from main.py):
 
 import logging
 import html
-import argparse
-import sys
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
@@ -47,34 +45,34 @@ logger = logging.getLogger(__name__)
 # Marker definitions - must match the recording module (sweep.py)
 # ---------------------------------------------------------------------------
 # Condition-aware markers (new)
-MARKER_FOT_STIM_ON   = 101   # Finger-On-Tactor: stimulation onset
-MARKER_FOT_STIM_OFF  = 111   # NFOT: stimulation offset
-MARKER_FOT_REST      = 100   # FOT: inter-trial rest
-MARKER_IFNFN_STIM_ON = 201   # In-Field-ot-Feeling-Nipple: stim onset
+MARKER_FOT_STIM_ON = 101  # Finger-On-Tactor: stimulation onset
+MARKER_FOT_STIM_OFF = 111  # NFOT: stimulation offset
+MARKER_FOT_REST = 100  # FOT: inter-trial rest
+MARKER_IFNFN_STIM_ON = 201  # In-Field-ot-Feeling-Nipple: stim onset
 MARKER_IFNFN_STIM_OFF = 211  # IFNFN: stimulation offset
-MARKER_IFNFN_REST    = 200   # IFNFN: inter-trial rest
+MARKER_IFNFN_REST = 200  # IFNFN: inter-trial rest
 
 # Legacy single-condition markers (backward compatibility)
-MARKER_STIM_ON       = 1
-MARKER_STIM_OFF      = 11
-MARKER_REST          = 0
+MARKER_STIM_ON = 1
+MARKER_STIM_OFF = 11
+MARKER_REST = 0
 
 MARKER_MAP: Dict[float, str] = {
     # New condition-aware markers
-    100.0:  "FOT_Rest [100]",
-    101.0:  "FOT_Stim_ON [101]",
-    111.0:  "FOT_Stim_OFF [111]",
-    200.0:  "IFNFN_Rest [200]",
-    201.0:  "IFNFN_Stim_ON [201]",
-    211.0:  "IFNFN_Stim_OFF [211]",
+    100.0: "FOT_Rest [100]",
+    101.0: "FOT_Stim_ON [101]",
+    111.0: "FOT_Stim_OFF [111]",
+    200.0: "IFNFN_Rest [200]",
+    201.0: "IFNFN_Stim_ON [201]",
+    211.0: "IFNFN_Stim_OFF [211]",
     # Legacy markers (single-condition recordings)
-    0.0:    "Stimulation READY [0]",
-    1.0:    "Stimulation ON [1]",
-    11.0:   "Stimulation OFF [11]",
-    3.0:    "Baseline_VHP_OFF [3]",
-    33.0:   "Baseline_VHP_ON [33]",
-    31.0:   "Baseline_NoContact [31]",
-    333.0:  "Baseline_PreSweep [333]",
+    0.0: "Stimulation READY [0]",
+    1.0: "Stimulation ON [1]",
+    11.0: "Stimulation OFF [11]",
+    3.0: "Baseline_VHP_OFF [3]",
+    33.0: "Baseline_VHP_ON [33]",
+    31.0: "Baseline_NoContact [31]",
+    333.0: "Baseline_PreSweep [333]",
 }
 
 
@@ -100,23 +98,23 @@ class TFRContrastConfig:
     tfr_fmin: float = 1.0
     tfr_fmax: float = 60.0
     tfr_fstep: float = 1.0
-    n_cycles_mode: str = "adaptive"    # "adaptive" = freqs/2, or fixed int
+    n_cycles_mode: str = "adaptive"  # "adaptive" = freqs/2, or fixed int
     n_cycles_fixed: float = 7.0
-    tfr_decim: int = 1                 # decimation factor (auto if 0)
+    tfr_decim: int = 1  # decimation factor (auto if 0)
 
     # --- Epoching windows (seconds, relative to STIM-ON) ---
-    epoch_tmin: float = -1.5           # start of epoch (must include baseline)
-    epoch_tmax: float = 5.0            # end of epoch
-    baseline_tmin: float = -1.0        # baseline window start
-    baseline_tmax: float = -0.5        # baseline window end
-    stim_window_tmin: float = 0.5      # stimulation analysis window start
-    stim_window_tmax: float = 4.0      # stimulation analysis window end
+    epoch_tmin: float = -1.5  # start of epoch (must include baseline)
+    epoch_tmax: float = 5.0  # end of epoch
+    baseline_tmin: float = -1.0  # baseline window start
+    baseline_tmax: float = -0.5  # baseline window end
+    stim_window_tmin: float = 0.5  # stimulation analysis window start
+    stim_window_tmax: float = 4.0  # stimulation analysis window end
 
     # --- Baseline normalization ---
-    baseline_mode: str = "logratio"    # "logratio", "ratio", "percent", "zscore"
+    baseline_mode: str = "logratio"  # "logratio", "ratio", "percent", "zscore"
 
     # --- Stimulation frequency (for summary analysis) ---
-    stim_freq: float = 42.0            # Hz — must match your VHP protocol
+    stim_freq: float = 42.0  # Hz — must match your VHP protocol
 
     # --- Filtering ---
     fmin: float = 0.5
@@ -158,6 +156,7 @@ class TFRContrastConfig:
         """
         try:
             import yaml
+
             with open(montage_path, "r") as f:
                 m = yaml.safe_load(f)
 
@@ -171,107 +170,28 @@ class TFRContrastConfig:
 
             if "channels" in m and _should_set("channels", self.channels, []):
                 self.channels = m["channels"]
-            if "pick_channels" in m and _should_set("pick_channels", self.pick_channels, None):
+            if "pick_channels" in m and _should_set(
+                "pick_channels", self.pick_channels, None
+            ):
                 self.pick_channels = m["pick_channels"]
             if "montage" in m and _should_set("montage", self.montage, "standard_1020"):
                 self.montage = m["montage"]
             if "name" in m and _should_set("name", self.montage_profile, "freg8"):
                 self.montage_profile = m["name"]
-            if "virtual_channels" in m and _should_set("virtual_channels", self.virtual_channels, None):
+            if "virtual_channels" in m and _should_set(
+                "virtual_channels", self.virtual_channels, None
+            ):
                 self.virtual_channels = m["virtual_channels"]
 
             logger.info(
                 "Applied montage '%s' from %s: %d channels, picks=%s",
-                m.get("name", "?"), montage_path.name,
-                len(self.channels), self.pick_channels,
+                m.get("name", "?"),
+                montage_path.name,
+                len(self.channels),
+                self.pick_channels,
             )
         except Exception as exc:
             logger.warning("Could not load montage YAML %s: %s", montage_path, exc)
-
-
-# ---------------------------------------------------------------------------
-# Helper: load CSV into MNE Raw
-# ---------------------------------------------------------------------------
-EEG_CHANNELS_COUNT = 32
-
-
-def load_csv_to_raw(
-    csv_path: Path,
-    channels: List[str],
-    montage_name: str,
-) -> mne.io.RawArray:
-    """
-    Load a sweep CSV (timestamp, 32×EEG, marker) into an MNE RawArray
-    with annotations derived from markers.
-    """
-    df = pd.read_csv(csv_path, header=None)
-
-    timestamps = df.iloc[:, 0].values
-    eeg_data = df.iloc[:, 1:EEG_CHANNELS_COUNT + 1].values.T  # (ch, samples)
-    markers = df.iloc[:, EEG_CHANNELS_COUNT + 1].values
-
-    # Sampling frequency from median ISI
-    if len(timestamps) > 1:
-        sfreq = 1.0 / np.median(np.diff(timestamps))
-    else:
-        sfreq = 512.0
-
-    # Channel names — pad or trim to 32, deduplicate "NC" entries
-    ch_names = list(channels)
-    if len(ch_names) < EEG_CHANNELS_COUNT:
-        ch_names += [f"NC{i}" for i in range(len(ch_names), EEG_CHANNELS_COUNT)]
-    ch_names = ch_names[:EEG_CHANNELS_COUNT]
-
-    # MNE requires unique channel names — rename duplicate "NC" entries
-    nc_counter = 0
-    for i, name in enumerate(ch_names):
-        if name == "NC":
-            ch_names[i] = f"NC{nc_counter}"
-            nc_counter += 1
-
-    info = mne.create_info(ch_names=ch_names, sfreq=sfreq, ch_types="eeg")
-    raw = mne.io.RawArray(eeg_data, info, verbose=False)
-
-    # Drop NC channels
-    nc_chans = [ch for ch in raw.ch_names if ch.startswith("NC")]
-    if nc_chans:
-        raw.drop_channels(nc_chans)
-
-    # Set standard montage
-    try:
-        montage = mne.channels.make_standard_montage(montage_name)
-        raw.set_montage(montage, on_missing="warn")
-    except Exception as exc:
-        logger.warning("Could not apply montage '%s': %s", montage_name, exc)
-
-    # Build annotations from marker column
-    valid_mask = pd.to_numeric(pd.Series(markers), errors="coerce").notna()
-    marker_vals = pd.to_numeric(pd.Series(markers), errors="coerce").values
-
-    if np.any(valid_mask):
-        idxs = np.where(valid_mask)[0]
-        onsets = timestamps[idxs] - timestamps[0]
-        descriptions = [
-            MARKER_MAP.get(float(marker_vals[i]), f"Event_{int(marker_vals[i])}")
-            for i in idxs
-        ]
-        annots = mne.Annotations(
-            onset=onsets,
-            duration=[0.01] * len(onsets),
-            description=descriptions,
-        )
-        raw.set_annotations(annots)
-        logger.info(
-            "Loaded %s: %d samples @ %.1f Hz, %d annotations",
-            csv_path.name, raw.n_times, sfreq, len(annots),
-        )
-    else:
-        logger.info(
-            "Loaded %s: %d samples @ %.1f Hz (no markers found)",
-            csv_path.name, raw.n_times, sfreq,
-        )
-
-    return raw
 
 
 # ---------------------------------------------------------------------------
@@ -290,9 +210,9 @@ class TFRContrastAnalyzer:
         self.cfg = config
         self.raw_fot: Optional[mne.io.RawArray] = None
         self.raw_ifnfn: Optional[mne.io.RawArray] = None
-        self.tfr_fot = None      # AverageTFR after baseline norm
+        self.tfr_fot = None  # AverageTFR after baseline norm
         self.tfr_ifnfn = None
-        self.tfr_contrast = None # FOT − IFNFN
+        self.tfr_contrast = None  # FOT − IFNFN
 
     # ------------------------------------------------------------------
     # Data loading
@@ -300,13 +220,9 @@ class TFRContrastAnalyzer:
     def load_two_files(self, fot_path: Path, ifnfn_path: Path) -> None:
         """Load separate FOT and IFNFN recordings (fully-blocked protocol)."""
         logger.info("Loading FOT file: %s", fot_path)
-        self.raw_fot = load_csv_to_raw(
-            fot_path, self.cfg.channels, self.cfg.montage
-        )
+        self.raw_fot = mne.io.read_raw_fif(fot_path, preload=True)
         logger.info("Loading IFNFN file: %s", ifnfn_path)
-        self.raw_ifnfn = load_csv_to_raw(
-            ifnfn_path, self.cfg.channels, self.cfg.montage
-        )
+        self.raw_ifnfn = mne.io.read_raw_fif(ifnfn_path, preload=True)
         # Apply virtual channels (e.g. Weighted Laplacian) before picking
         self._apply_virtual_channels(self.raw_fot)
         self._apply_virtual_channels(self.raw_ifnfn)
@@ -314,13 +230,13 @@ class TFRContrastAnalyzer:
         self._apply_picks(self.raw_fot)
         self._apply_picks(self.raw_ifnfn)
 
-    def load_single_file(self, csv_path: Path) -> None:
+    def load_single_file(self, raw_path: Path) -> None:
         """
         Load a single CSV that contains interleaved FOT/IFNFN trials
         (alternating or randomized protocol).  Condition is determined
         by marker codes 101/201.
         """
-        raw = load_csv_to_raw(csv_path, self.cfg.channels, self.cfg.montage)
+        raw = mne.io.read_raw_fif(raw_path, preload=True)
         self._apply_virtual_channels(raw)
         self._apply_picks(raw)
         # Both conditions share the same Raw — epoching separates them
@@ -341,7 +257,8 @@ class TFRContrastAnalyzer:
                 if base_ch not in raw.ch_names:
                     logger.warning(
                         "Base channel %s for virtual channel %s not found. Skipping.",
-                        base_ch, name
+                        base_ch,
+                        name,
                     )
                     continue
 
@@ -356,7 +273,8 @@ class TFRContrastAnalyzer:
                     else:
                         logger.warning(
                             "Ref channel %s for virtual channel %s not found. Skipping weight.",
-                            ref_ch, name
+                            ref_ch,
+                            name,
                         )
 
                 # Laplacian = Base - (WeightedSum / Divisor)
@@ -379,7 +297,7 @@ class TFRContrastAnalyzer:
         if picks:
             valid = [ch for ch in picks if ch in raw.ch_names]
             if valid:
-                raw.pick_channels(valid)
+                raw.pick(valid)
                 logger.info("Picked channels: %s", valid)
 
     # ------------------------------------------------------------------
@@ -399,7 +317,9 @@ class TFRContrastAnalyzer:
                 raw_filtered.notch_filter(valid_notch, verbose=False)
         logger.info(
             "Preprocessed: band-pass %.1f–%.1f Hz, notch %s",
-            self.cfg.fmin, self.cfg.fmax, self.cfg.notch_freqs,
+            self.cfg.fmin,
+            self.cfg.fmax,
+            self.cfg.notch_freqs,
         )
         return raw_filtered
 
@@ -434,21 +354,21 @@ class TFRContrastAnalyzer:
             if self.cfg.legacy_stim_event in event_id:
                 logger.warning(
                     "Event '%s' not found; falling back to legacy '%s'.",
-                    event_name, self.cfg.legacy_stim_event,
+                    event_name,
+                    self.cfg.legacy_stim_event,
                 )
                 event_name = self.cfg.legacy_stim_event
             else:
                 logger.error(
                     "Event '%s' not found. Available: %s",
-                    event_name, list(event_id.keys()),
+                    event_name,
+                    list(event_id.keys()),
                 )
                 return None
 
         target_id = event_id[event_name]
         n_trials = np.sum(events[:, 2] == target_id)
-        logger.info(
-            "Condition '%s': %d trials found.", event_name, n_trials
-        )
+        logger.info("Condition '%s': %d trials found.", event_name, n_trials)
         if n_trials == 0:
             return None
 
@@ -459,7 +379,7 @@ class TFRContrastAnalyzer:
             event_id=target_id,
             tmin=self.cfg.epoch_tmin,
             tmax=self.cfg.epoch_tmax,
-            baseline=None,            # We apply TFR-level baseline later
+            baseline=None,  # We apply TFR-level baseline later
             preload=True,
             verbose=False,
             on_missing="warning",
@@ -523,7 +443,9 @@ class TFRContrastAnalyzer:
         Returns True on success.
         """
         if self.raw_fot is None:
-            logger.error("No data loaded. Call load_two_files() or load_single_file() first.")
+            logger.error(
+                "No data loaded. Call load_two_files() or load_single_file() first."
+            )
             return False
 
         # Preprocess
@@ -531,9 +453,7 @@ class TFRContrastAnalyzer:
         raw_ifnfn_clean = self.preprocess(self.raw_ifnfn)
 
         # Steps 1–3 per condition
-        self.tfr_fot = self.compute_condition_tfr(
-            raw_fot_clean, self.cfg.fot_event
-        )
+        self.tfr_fot = self.compute_condition_tfr(raw_fot_clean, self.cfg.fot_event)
         self.tfr_ifnfn = self.compute_condition_tfr(
             raw_ifnfn_clean, self.cfg.ifnfn_event
         )
@@ -561,15 +481,11 @@ class TFRContrastAnalyzer:
 
         if condition == "fot":
             raw_clean = self.preprocess(self.raw_fot)
-            self.tfr_fot = self.compute_condition_tfr(
-                raw_clean, self.cfg.fot_event
-            )
+            self.tfr_fot = self.compute_condition_tfr(raw_clean, self.cfg.fot_event)
             return self.tfr_fot is not None
         else:
             raw_clean = self.preprocess(self.raw_ifnfn)
-            self.tfr_ifnfn = self.compute_condition_tfr(
-                raw_clean, self.cfg.ifnfn_event
-            )
+            self.tfr_ifnfn = self.compute_condition_tfr(raw_clean, self.cfg.ifnfn_event)
             return self.tfr_ifnfn is not None
 
     # ------------------------------------------------------------------
@@ -592,14 +508,11 @@ class TFRContrastAnalyzer:
 
         if orientation == "vertical":
             # Baseline region (blue tint)
-            ax.axvspan(bl_min, bl_max, color="#3B82F6", alpha=0.08,
-                       label="_baseline")
+            ax.axvspan(bl_min, bl_max, color="#3B82F6", alpha=0.08, label="_baseline")
             # Excluded zone (red tint)
-            ax.axvspan(bl_max, stim_min, color="#EF4444", alpha=0.06,
-                       label="_excluded")
+            ax.axvspan(bl_max, stim_min, color="#EF4444", alpha=0.06, label="_excluded")
             # Stimulation window (green tint)
-            ax.axvspan(stim_min, stim_max, color="#10B981", alpha=0.06,
-                       label="_stim")
+            ax.axvspan(stim_min, stim_max, color="#10B981", alpha=0.06, label="_stim")
 
             # Stim ON marker line
             ax.axvline(0, color="#EF4444", linestyle="--", linewidth=1.2, alpha=0.8)
@@ -608,8 +521,12 @@ class TFRContrastAnalyzer:
             ylim = ax.get_ylim()
             label_y = ylim[1]  # top of axis
             label_kwargs = dict(
-                fontsize=7, fontweight="bold", ha="center", va="bottom",
-                alpha=0.7, clip_on=True,
+                fontsize=7,
+                fontweight="bold",
+                ha="center",
+                va="bottom",
+                alpha=0.7,
+                clip_on=True,
             )
             mid_bl = (bl_min + bl_max) / 2
             mid_ex = (bl_max + stim_min) / 2
@@ -618,8 +535,16 @@ class TFRContrastAnalyzer:
             ax.text(mid_bl, label_y, "BASELINE", color="#3B82F6", **label_kwargs)
             ax.text(mid_ex, label_y, "ONSET", color="#EF4444", **label_kwargs)
             ax.text(mid_st, label_y, "STIMULATION", color="#10B981", **label_kwargs)
-            ax.text(0, label_y, "STIM ON", color="#EF4444",
-                    fontsize=6, ha="center", va="top", alpha=0.6)
+            ax.text(
+                0,
+                label_y,
+                "STIM ON",
+                color="#EF4444",
+                fontsize=6,
+                ha="center",
+                va="top",
+                alpha=0.6,
+            )
 
     # ------------------------------------------------------------------
     # Visualization helpers
@@ -627,11 +552,28 @@ class TFRContrastAnalyzer:
     def _stim_freq_line(self, ax, orientation: str = "horizontal") -> None:
         """Draw a dashed line at the stimulation frequency on TFR heatmaps."""
         sf = self.cfg.stim_freq
-        if orientation == "horizontal":
-            ax.axhline(sf, color="#F59E0B", linestyle="--", linewidth=0.9, alpha=0.7)
-            ax.text(ax.get_xlim()[1], sf, f" {sf:.0f} Hz",
-                    fontsize=7, va="center", ha="left", color="#F59E0B",
-                    fontweight="bold", alpha=0.8, clip_on=False)
+        last_sf = int(self.cfg.tfr_fmax / self.cfg.stim_freq) + 1
+        for i in range(1, last_sf):
+            if i > 1:
+                color = "#CC3300"
+            else:
+                color = "#F59E0B"
+            if orientation == "horizontal":
+                ax.axhline(
+                    i * sf, color=color, linestyle="--", linewidth=0.9, alpha=0.7
+                )
+                ax.text(
+                    ax.get_xlim()[1],
+                    i * sf,
+                    f" {i * sf:.0f} Hz",
+                    fontsize=7,
+                    va="center",
+                    ha="left",
+                    color=color,
+                    fontweight="bold",
+                    alpha=0.8,
+                    clip_on=False,
+                )
 
     def plot_tfr(
         self,
@@ -656,7 +598,8 @@ class TFRContrastAnalyzer:
 
         n_channels = len(tfr.ch_names)
         fig, axes = plt.subplots(
-            n_channels, 1,
+            n_channels,
+            1,
             figsize=(14, 3.0 * n_channels),
             squeeze=False,
         )
@@ -675,10 +618,14 @@ class TFRContrastAnalyzer:
             tfr.plot(
                 picks=[ch_name],
                 baseline=None,
-                tmin=_tmin, tmax=_tmax,
-                fmin=_fmin, fmax=_fmax,
-                axes=ax, show=False,
-                colorbar=True, cmap=cmap,
+                tmin=_tmin,
+                tmax=_tmax,
+                fmin=_fmin,
+                fmax=_fmax,
+                axes=ax,
+                show=False,
+                colorbar=True,
+                cmap=cmap,
                 vlim=(vmin, vmax),
                 verbose=False,
             )
@@ -719,11 +666,13 @@ class TFRContrastAnalyzer:
         ch_idx = self.tfr_fot.ch_names.index(ch)
         time_mask = (self.tfr_fot.times >= _tmin) & (self.tfr_fot.times <= _tmax)
         freq_mask = (self.tfr_fot.freqs >= _fmin) & (self.tfr_fot.freqs <= _fmax)
-        all_data = np.concatenate([
-            self.tfr_fot.data[ch_idx, freq_mask, :][:, time_mask].ravel(),
-            self.tfr_ifnfn.data[ch_idx, freq_mask, :][:, time_mask].ravel(),
-            self.tfr_contrast.data[ch_idx, freq_mask, :][:, time_mask].ravel(),
-        ])
+        all_data = np.concatenate(
+            [
+                self.tfr_fot.data[ch_idx, freq_mask, :][:, time_mask].ravel(),
+                self.tfr_ifnfn.data[ch_idx, freq_mask, :][:, time_mask].ravel(),
+                self.tfr_contrast.data[ch_idx, freq_mask, :][:, time_mask].ravel(),
+            ]
+        )
         abs_max = np.percentile(np.abs(all_data), 97)
 
         fig, axes = plt.subplots(1, 3, figsize=(22, 5))
@@ -734,11 +683,16 @@ class TFRContrastAnalyzer:
             ["FOT (Tactile + EM)", "IFNFN (EM only)", "Contrast (FOT - IFNFN)"],
         ):
             tfr.plot(
-                picks=[ch], baseline=None,
-                tmin=_tmin, tmax=_tmax,
-                fmin=_fmin, fmax=_fmax,
-                axes=ax, show=False,
-                colorbar=True, cmap="RdBu_r",
+                picks=[ch],
+                baseline=None,
+                tmin=_tmin,
+                tmax=_tmax,
+                fmin=_fmin,
+                fmax=_fmax,
+                axes=ax,
+                show=False,
+                colorbar=True,
+                cmap="RdBu_r",
                 vlim=(-abs_max, abs_max),
                 verbose=False,
             )
@@ -778,8 +732,9 @@ class TFRContrastAnalyzer:
 
         # Top: both conditions
         axes[0].plot(times, fot_data, color="#2563EB", label="FOT", linewidth=1.5)
-        axes[0].plot(times, ifnfn_data, color="#DC2626", label="IFNFN",
-                     linewidth=1.5, alpha=0.8)
+        axes[0].plot(
+            times, ifnfn_data, color="#DC2626", label="IFNFN", linewidth=1.5, alpha=0.8
+        )
         axes[0].axhline(0, color="gray", linestyle=":", alpha=0.3)
         axes[0].set_ylabel(f"Power ({self.cfg.baseline_mode})")
         axes[0].set_title(
@@ -793,12 +748,20 @@ class TFRContrastAnalyzer:
         # Bottom: contrast
         axes[1].plot(times, contrast_data, color="#1E293B", linewidth=1.8)
         axes[1].fill_between(
-            times, contrast_data, 0,
-            where=contrast_data > 0, color="#2563EB", alpha=0.15,
+            times,
+            contrast_data,
+            0,
+            where=contrast_data > 0,
+            color="#2563EB",
+            alpha=0.15,
         )
         axes[1].fill_between(
-            times, contrast_data, 0,
-            where=contrast_data < 0, color="#DC2626", alpha=0.15,
+            times,
+            contrast_data,
+            0,
+            where=contrast_data < 0,
+            color="#DC2626",
+            alpha=0.15,
         )
         axes[1].axhline(0, color="gray", linestyle=":", alpha=0.5)
         axes[1].set_xlabel("Time (s)")
@@ -865,12 +828,14 @@ class TFRContrastAnalyzer:
         self._export_csv(csv_dir)
 
         # --- Collect data for the report ---
-        n_fot = str(getattr(self.tfr_fot, 'nave', '?')) if self.tfr_fot else "N/A"
-        n_ifnfn = str(getattr(self.tfr_ifnfn, 'nave', '?')) if self.tfr_ifnfn else "N/A"
+        n_fot = str(getattr(self.tfr_fot, "nave", "?")) if self.tfr_fot else "N/A"
+        n_ifnfn = str(getattr(self.tfr_ifnfn, "nave", "?")) if self.tfr_ifnfn else "N/A"
         ch_names = self.tfr_fot.ch_names if self.tfr_fot else []
 
         # Breakdown into physical and virtual
-        virt_names = list(self.cfg.virtual_channels.keys()) if self.cfg.virtual_channels else []
+        virt_names = (
+            list(self.cfg.virtual_channels.keys()) if self.cfg.virtual_channels else []
+        )
         ch_names_phys = [ch for ch in ch_names if ch not in virt_names]
         ch_names_virt = [ch for ch in ch_names if ch in virt_names]
         n_ch_phys = len(ch_names_phys)
@@ -902,25 +867,28 @@ class TFRContrastAnalyzer:
             fig = self.plot_tfr(self.tfr_fot, title="FOT (Tactile + EM Noise)")
             overview_plots += (
                 '<div class="subsection">'
-                '<h3>FOT Condition (Finger On Tactor)</h3>'
+                "<h3>FOT Condition (Finger On Tactor)</h3>"
                 '<p class="caption">Contains both the neural response and EM artifact from the vibration motor.</p>'
-                + _fig_block(fig, "TFR_FOT") + '</div>'
+                + _fig_block(fig, "TFR_FOT")
+                + "</div>"
             )
         if self.tfr_ifnfn is not None:
             fig = self.plot_tfr(self.tfr_ifnfn, title="IFNFN (EM Noise Only)")
             overview_plots += (
                 '<div class="subsection">'
-                '<h3>IFNFN Condition (In-Field Not-Feeling Nipple)</h3>'
+                "<h3>IFNFN Condition (In-Field Not-Feeling Nipple)</h3>"
                 '<p class="caption">Control: same EM noise, no tactile contact. Serves as the artifact template.</p>'
-                + _fig_block(fig, "TFR_IFNFN") + '</div>'
+                + _fig_block(fig, "TFR_IFNFN")
+                + "</div>"
             )
         if self.tfr_contrast is not None:
             fig = self.plot_contrast()
             overview_plots += (
                 '<div class="subsection">'
-                '<h3>Contrast (FOT &minus; IFNFN)</h3>'
+                "<h3>Contrast (FOT &minus; IFNFN)</h3>"
                 '<p class="caption">Isolated neural response after EM artifact subtraction.</p>'
-                + _fig_block(fig, "TFR_Contrast") + '</div>'
+                + _fig_block(fig, "TFR_Contrast")
+                + "</div>"
             )
 
         # --- Section 3: Per-channel comparisons (collapsible) ---
@@ -930,10 +898,13 @@ class TFRContrastAnalyzer:
                 fig_comp = self.plot_both_conditions(channel=ch)
                 if fig_comp:
                     comparison_plots += (
-                        f'<details><summary><strong>{ch}</strong></summary>'
-                        + _fig_block(fig_comp, f"Comparison_{ch}",
-                                     f"Left: FOT | Center: IFNFN | Right: Contrast")
-                        + '</details>'
+                        f"<details><summary><strong>{ch}</strong></summary>"
+                        + _fig_block(
+                            fig_comp,
+                            f"Comparison_{ch}",
+                            f"Left: FOT | Center: IFNFN | Right: Contrast",
+                        )
+                        + "</details>"
                     )
 
         # --- Section 4: Band time-courses (collapsible, grouped by band) ---
@@ -942,9 +913,11 @@ class TFRContrastAnalyzer:
             stim_low = self.cfg.stim_freq - 5.0
             stim_high = self.cfg.stim_freq + 5.0
             bands = [
-                (f"Stim Frequency ({stim_low:.1f}&ndash;{stim_high:.1f} Hz)",
-                 f"StimFreq_{self.cfg.stim_freq}Hz",
-                 (stim_low, stim_high)),
+                (
+                    f"Stim Frequency ({stim_low:.1f}&ndash;{stim_high:.1f} Hz)",
+                    f"StimFreq_{self.cfg.stim_freq}Hz",
+                    (stim_low, stim_high),
+                ),
                 ("Beta (13&ndash;30 Hz)", "Beta_13-30Hz", (13.0, 30.0)),
                 ("Gamma (30&ndash;45 Hz)", "Gamma_30-45Hz", (30.0, 45.0)),
             ]
@@ -956,16 +929,19 @@ class TFRContrastAnalyzer:
                     )
                     if fig_tc:
                         inner += (
-                            f'<details><summary>{ch}</summary>'
-                            + _fig_block(fig_tc, f"Band_{band_id}_{ch}",
-                                         "Top: FOT vs IFNFN band power. "
-                                         "Bottom: contrast (isolated neural modulation).")
-                            + '</details>'
+                            f"<details><summary>{ch}</summary>"
+                            + _fig_block(
+                                fig_tc,
+                                f"Band_{band_id}_{ch}",
+                                "Top: FOT vs IFNFN band power. "
+                                "Bottom: contrast (isolated neural modulation).",
+                            )
+                            + "</details>"
                         )
                 if inner:
                     band_plots += (
-                        f'<details><summary><strong>{band_label}</strong></summary>'
-                        f'{inner}</details>'
+                        f"<details><summary><strong>{band_label}</strong></summary>"
+                        f"{inner}</details>"
                     )
 
         # --- Assemble HTML ---
@@ -1187,7 +1163,9 @@ Click a band to expand, then click a channel.</p>
         report_path.write_text(html_content, encoding="utf-8")
         logger.info(
             "Report saved: %s (%d plots in png/, %d CSVs in csv/)",
-            report_path, plot_counter, len(list(csv_dir.glob("*.csv"))),
+            report_path,
+            plot_counter,
+            len(list(csv_dir.glob("*.csv"))),
         )
         return report_path
 
@@ -1203,13 +1181,15 @@ Click a band to expand, then click a channel.</p>
           - tfr_ifnfn_full.csv
           - tfr_contrast_full.csv
         """
+
         def _save_band_avg(tfr, name: str):
             """Save frequency-profile CSV: mean power during stim window."""
             if tfr is None:
                 return
             times = tfr.times
-            stim_mask = (times >= self.cfg.stim_window_tmin) & \
-                        (times <= self.cfg.stim_window_tmax)
+            stim_mask = (times >= self.cfg.stim_window_tmin) & (
+                times <= self.cfg.stim_window_tmax
+            )
 
             # Average over the stimulation time window -> (channels, freqs)
             stim_avg = tfr.data[:, :, stim_mask].mean(axis=2)
@@ -1238,8 +1218,7 @@ Click a band to expand, then click a channel.</p>
                 df.index.name = "frequency"
                 path = csv_dir / f"{name}_{ch_name}.csv"
                 df.to_csv(path)
-            logger.info("Exported %s (per-channel, %d files)", name,
-                        len(tfr.ch_names))
+            logger.info("Exported %s (per-channel, %d files)", name, len(tfr.ch_names))
 
         # Frequency profiles (compact: one row per channel)
         _save_band_avg(self.tfr_fot, "tfr_fot_stim_avg")
@@ -1289,18 +1268,26 @@ Click a band to expand, then click a channel.</p>
         times = self.tfr_contrast.times
 
         # Frequency masks
-        stim_freq_mask = (freqs >= stim_freq - freq_tolerance) & \
-                         (freqs <= stim_freq + freq_tolerance)
+        stim_freq_mask = (freqs >= stim_freq - freq_tolerance) & (
+            freqs <= stim_freq + freq_tolerance
+        )
         # Beta band EXCLUDING the stim frequency to avoid contamination
-        beta_mask = (freqs >= 13.0) & (freqs <= 30.0) & \
-                    ~((freqs >= stim_freq - freq_tolerance) &
-                      (freqs <= stim_freq + freq_tolerance))
+        beta_mask = (
+            (freqs >= 13.0)
+            & (freqs <= 30.0)
+            & ~(
+                (freqs >= stim_freq - freq_tolerance)
+                & (freqs <= stim_freq + freq_tolerance)
+            )
+        )
 
         # Time masks
-        stim_time_mask = (times >= self.cfg.stim_window_tmin) & \
-                         (times <= self.cfg.stim_window_tmax)
-        base_time_mask = (times >= self.cfg.baseline_tmin) & \
-                         (times <= self.cfg.baseline_tmax)
+        stim_time_mask = (times >= self.cfg.stim_window_tmin) & (
+            times <= self.cfg.stim_window_tmax
+        )
+        base_time_mask = (times >= self.cfg.baseline_tmin) & (
+            times <= self.cfg.baseline_tmax
+        )
 
         if not np.any(stim_freq_mask) or not np.any(stim_time_mask):
             logger.warning("Stim frequency or time window out of TFR range.")
@@ -1309,10 +1296,12 @@ Click a band to expand, then click a channel.</p>
         rows = []
         for ch_idx, ch_name in enumerate(self.tfr_contrast.ch_names):
             # --- Contrast at stim frequency: time-point distributions ---
-            contrast_stim_vals = self.tfr_contrast.data[
-                ch_idx][stim_freq_mask][:, stim_time_mask].mean(axis=0)
-            contrast_base_vals = self.tfr_contrast.data[
-                ch_idx][stim_freq_mask][:, base_time_mask].mean(axis=0)
+            contrast_stim_vals = self.tfr_contrast.data[ch_idx][stim_freq_mask][
+                :, stim_time_mask
+            ].mean(axis=0)
+            contrast_base_vals = self.tfr_contrast.data[ch_idx][stim_freq_mask][
+                :, base_time_mask
+            ].mean(axis=0)
 
             contrast_stim_mean = float(contrast_stim_vals.mean())
             contrast_base_mean = float(contrast_base_vals.mean())
@@ -1332,10 +1321,12 @@ Click a band to expand, then click a channel.</p>
             sssep_detected = (contrast_stim_mean > 0) and (cohens_d >= 0.5)
 
             # --- FOT and IFNFN individually at stim frequency ---
-            fot_stim = float(self.tfr_fot.data[
-                ch_idx][stim_freq_mask][:, stim_time_mask].mean())
-            ifnfn_stim = float(self.tfr_ifnfn.data[
-                ch_idx][stim_freq_mask][:, stim_time_mask].mean())
+            fot_stim = float(
+                self.tfr_fot.data[ch_idx][stim_freq_mask][:, stim_time_mask].mean()
+            )
+            ifnfn_stim = float(
+                self.tfr_ifnfn.data[ch_idx][stim_freq_mask][:, stim_time_mask].mean()
+            )
 
             # --- EM cancellation ratio ---
             # Only meaningful when both FOT and IFNFN show enhancement
@@ -1350,10 +1341,12 @@ Click a band to expand, then click a channel.</p>
 
             # --- Beta band contrast (excluding stim freq) ---
             if np.any(beta_mask):
-                beta_stim_vals = self.tfr_contrast.data[
-                    ch_idx][beta_mask][:, stim_time_mask].mean(axis=0)
-                beta_base_vals = self.tfr_contrast.data[
-                    ch_idx][beta_mask][:, base_time_mask].mean(axis=0)
+                beta_stim_vals = self.tfr_contrast.data[ch_idx][beta_mask][
+                    :, stim_time_mask
+                ].mean(axis=0)
+                beta_base_vals = self.tfr_contrast.data[ch_idx][beta_mask][
+                    :, base_time_mask
+                ].mean(axis=0)
                 beta_contrast = float(beta_stim_vals.mean())
 
                 # Cohen's d for beta ERD: stim vs baseline in beta band
@@ -1361,8 +1354,9 @@ Click a band to expand, then click a channel.</p>
                     (beta_stim_vals.var() + beta_base_vals.var()) / 2.0
                 )
                 if beta_pooled > 0:
-                    beta_d = (float(beta_stim_vals.mean()) -
-                              float(beta_base_vals.mean())) / beta_pooled
+                    beta_d = (
+                        float(beta_stim_vals.mean()) - float(beta_base_vals.mean())
+                    ) / beta_pooled
                 else:
                     beta_d = 0.0
             else:
@@ -1377,21 +1371,33 @@ Click a band to expand, then click a channel.</p>
             # Classification
             is_neural = ch_name in neural_channels
 
-            rows.append({
-                "Channel": ch_name,
-                "Type": "Somatosensory" if is_neural else "Other",
-                f"Contrast @ {stim_freq:.0f}Hz (stim)": round(contrast_stim_mean, 4),
-                f"Contrast @ {stim_freq:.0f}Hz (base)": round(contrast_base_mean, 4),
-                "Stim - Baseline": round(contrast_stim_mean - contrast_base_mean, 4),
-                "SSSEP d": round(cohens_d, 2),
-                "SSSEP": sssep_detected,
-                f"FOT @ {stim_freq:.0f}Hz": round(fot_stim, 4),
-                f"IFNFN @ {stim_freq:.0f}Hz": round(ifnfn_stim, 4),
-                "EM Cancelled (%)": round(em_cancelled_pct, 1) if not np.isnan(em_cancelled_pct) else np.nan,
-                "Beta Contrast": round(beta_contrast, 4),
-                "Beta ERD d": round(beta_d, 2),
-                "Beta ERD": beta_erd_detected,
-            })
+            rows.append(
+                {
+                    "Channel": ch_name,
+                    "Type": "Somatosensory" if is_neural else "Other",
+                    f"Contrast @ {stim_freq:.0f}Hz (stim)": round(
+                        contrast_stim_mean, 4
+                    ),
+                    f"Contrast @ {stim_freq:.0f}Hz (base)": round(
+                        contrast_base_mean, 4
+                    ),
+                    "Stim - Baseline": round(
+                        contrast_stim_mean - contrast_base_mean, 4
+                    ),
+                    "SSSEP d": round(cohens_d, 2),
+                    "SSSEP": sssep_detected,
+                    f"FOT @ {stim_freq:.0f}Hz": round(fot_stim, 4),
+                    f"IFNFN @ {stim_freq:.0f}Hz": round(ifnfn_stim, 4),
+                    "EM Cancelled (%)": (
+                        round(em_cancelled_pct, 1)
+                        if not np.isnan(em_cancelled_pct)
+                        else np.nan
+                    ),
+                    "Beta Contrast": round(beta_contrast, 4),
+                    "Beta ERD d": round(beta_d, 2),
+                    "Beta ERD": beta_erd_detected,
+                }
+            )
 
         df = pd.DataFrame(rows)
         logger.info("Channel summary computed for %.0f Hz.", stim_freq)
@@ -1423,24 +1429,38 @@ Click a band to expand, then click a channel.</p>
         # SSSEP stats
         n_sssep = int(summary_df["SSSEP"].sum())
         n_soma_sssep = int(soma_df["SSSEP"].sum()) if n_soma_total > 0 else 0
-        mean_soma_sssep_d = float(soma_df["SSSEP d"].mean()) if n_soma_total > 0 else 0.0
-        mean_soma_effect = float(soma_df["Stim - Baseline"].mean()) if n_soma_total > 0 else 0.0
-        mean_other_effect = float(other_df["Stim - Baseline"].mean()) if len(other_df) > 0 else 0.0
+        mean_soma_sssep_d = (
+            float(soma_df["SSSEP d"].mean()) if n_soma_total > 0 else 0.0
+        )
+        mean_soma_effect = (
+            float(soma_df["Stim - Baseline"].mean()) if n_soma_total > 0 else 0.0
+        )
+        mean_other_effect = (
+            float(other_df["Stim - Baseline"].mean()) if len(other_df) > 0 else 0.0
+        )
         topo_specific = mean_soma_effect > mean_other_effect and mean_soma_effect > 0
 
         # Beta ERD stats
         n_beta_erd = int(summary_df["Beta ERD"].sum())
         n_soma_beta_erd = int(soma_df["Beta ERD"].sum()) if n_soma_total > 0 else 0
-        soma_beta_mean = float(soma_df["Beta Contrast"].mean()) if n_soma_total > 0 else 0.0
-        soma_beta_d_mean = float(soma_df["Beta ERD d"].mean()) if n_soma_total > 0 else 0.0
+        soma_beta_mean = (
+            float(soma_df["Beta Contrast"].mean()) if n_soma_total > 0 else 0.0
+        )
+        soma_beta_d_mean = (
+            float(soma_df["Beta ERD d"].mean()) if n_soma_total > 0 else 0.0
+        )
 
         # Effect size label helper
         def _d_label(d):
             ad = abs(d)
-            if ad >= 0.8: return "large"
-            elif ad >= 0.5: return "medium"
-            elif ad >= 0.2: return "small"
-            else: return "negligible"
+            if ad >= 0.8:
+                return "large"
+            elif ad >= 0.5:
+                return "medium"
+            elif ad >= 0.2:
+                return "small"
+            else:
+                return "negligible"
 
         # --- SSSEP verdict ---
         if n_soma_sssep == n_soma_total and n_soma_total > 0 and topo_specific:
@@ -1506,10 +1526,14 @@ Click a band to expand, then click a channel.</p>
 
             # SSSEP d color
             sssep_d = row["SSSEP d"]
-            if sssep_d >= 0.8: sssep_d_bg = "#D1FAE5"
-            elif sssep_d >= 0.5: sssep_d_bg = "#FEF3C7"
-            elif sssep_d >= 0.2: sssep_d_bg = "#FEF9C3"
-            else: sssep_d_bg = "transparent"
+            if sssep_d >= 0.8:
+                sssep_d_bg = "#D1FAE5"
+            elif sssep_d >= 0.5:
+                sssep_d_bg = "#FEF3C7"
+            elif sssep_d >= 0.2:
+                sssep_d_bg = "#FEF9C3"
+            else:
+                sssep_d_bg = "transparent"
 
             # Beta ERD detection styling
             beta_erd = row["Beta ERD"]
@@ -1529,12 +1553,17 @@ Click a band to expand, then click a channel.</p>
             # EM cancellation
             em_pct = row["EM Cancelled (%)"]
             em_is_nan = pd.isna(em_pct)
-            if em_is_nan: em_style = "color:#9CA3AF;"
-            elif em_pct > 80: em_style = "color:#DC2626;"
-            elif em_pct > 50: em_style = "color:#D97706;"
-            else: em_style = "color:#059669;"
+            if em_is_nan:
+                em_style = "color:#9CA3AF;"
+            elif em_pct > 80:
+                em_style = "color:#DC2626;"
+            elif em_pct > 50:
+                em_style = "color:#D97706;"
+            else:
+                em_style = "color:#059669;"
 
-            table_rows.append(f"""<tr>
+            table_rows.append(
+                f"""<tr>
                 <td><strong>{html.escape(row['Channel'])}</strong></td>
                 <td><span style="background:{type_bg};color:white;
                     padding:2px 8px;border-radius:3px;font-size:0.8em;">
@@ -1549,7 +1578,8 @@ Click a band to expand, then click a channel.</p>
                 <td style="text-align:right;{beta_style}">{beta_val:+.4f}</td>
                 <td style="text-align:right;">{beta_d_val:+.2f}</td>
                 <td style="text-align:center;color:{beta_erd_color};font-size:1.1em;">{beta_icon}</td>
-            </tr>""")
+            </tr>"""
+            )
 
         # --- EM cancellation summary ---
         em_valid = summary_df["EM Cancelled (%)"].dropna()
@@ -1715,97 +1745,9 @@ Click a band to expand, then click a channel.</p>
 
         # Check FOT and IFNFN have identical channel sets
         if set(self.tfr_fot.ch_names) != set(self.tfr_ifnfn.ch_names):
-            return (f"FOT/IFNFN channel mismatch: "
-                    f"{self.tfr_fot.ch_names} vs {self.tfr_ifnfn.ch_names}")
-
-        return None
-
-
-
-
-# ---------------------------------------------------------------------------
-# CLI entry point
-# ---------------------------------------------------------------------------
-def main():
-    parser = argparse.ArgumentParser(
-        description="TFR Contrast Analysis (Section 9 Pipeline)"
-    )
-    parser.add_argument(
-        "--fot", type=Path, required=True,
-        help="CSV file for FOT condition",
-    )
-    parser.add_argument(
-        "--ifnfn", type=Path, required=True,
-        help="CSV file for IFNFN condition",
-    )
-    parser.add_argument(
-        "--config", type=Path, default=None,
-        help="Analysis YAML config (optional)",
-    )
-    parser.add_argument(
-        "--output", type=Path, default=Path("reports"),
-        help="Output directory for report",
-    )
-    parser.add_argument(
-        "--stim-freq", type=float, default=None,
-        help="Stimulation frequency in Hz for summary analysis (default: 42.0)",
-    )
-    parser.add_argument(
-        "--montage", type=Path, default=None,
-        help="Montage YAML file (e.g. config/montages/freg9.yaml). "
-             "Overrides channels and pick_channels from the montage definition.",
-    )
-    args = parser.parse_args()
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)-8s | %(message)s",
-        datefmt="%H:%M:%S",
-    )
-
-    # Build config
-    if args.config and args.config.exists():
-        import yaml
-        with open(args.config) as f:
-            cfg = TFRContrastConfig.from_yaml(yaml.safe_load(f))
-    else:
-        cfg = TFRContrastConfig()
-
-    # Apply montage YAML if provided (overrides channels/picks from config)
-    if args.montage:
-        cfg.apply_montage_yaml(args.montage)
-    elif cfg.montage_profile:
-        # Automatically resolve the profile name if it's not the default freg8
-        # (or even if it is, to ensure all fields are loaded correctly)
-        montage_dir = (
-            Path(__file__).resolve().parent.parent.parent.parent
-            / "config"
-            / "montages"
-        )
-        profile_path = montage_dir / f"{cfg.montage_profile}.yaml"
-        if profile_path.exists():
-            cfg.apply_montage_yaml(profile_path, overwrite=False)
-        else:
-            logger.warning(
-                "Montage profile '%s' not found at %s",
-                cfg.montage_profile, profile_path
+            return (
+                f"FOT/IFNFN channel mismatch: "
+                f"{self.tfr_fot.ch_names} vs {self.tfr_ifnfn.ch_names}"
             )
 
-    cfg.output_dir = str(args.output)
-    if args.stim_freq is not None:
-        cfg.stim_freq = args.stim_freq
-
-    # Run pipeline
-    analyzer = TFRContrastAnalyzer(cfg)
-    analyzer.load_two_files(args.fot, args.ifnfn)
-
-    if analyzer.run_pipeline():
-        report = analyzer.generate_report()
-        print(f"\n✅ Report: {report}")
-    else:
-        print("\n❌ Pipeline failed. Check logs above.")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
+        return None

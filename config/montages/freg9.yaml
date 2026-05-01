@@ -30,7 +30,8 @@ channels: [
     NC, NC
 ]
 # Automatically pick only the valid channels for analysis
-pick_channels: [T7, C3, T8, FC4, FC3, C4, CP3, CP4, Cz, S1_left, S1_right]
+# pick_channels: [T7, C3, T8, FC4, FC3, C4, CP3, CP4, Cz, S1_left, S1_right]
+pick_channels: [T7, C3, T8, FC4, FC3, C4, CP3, CP4, Cz]
 
 # Virtual channels for weighted Laplacian (S1 focus)
 # S1_left = C3 - (2*FC3 + 2*CP3 + Cz + T7) / 6

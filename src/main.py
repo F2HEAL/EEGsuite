@@ -34,18 +34,24 @@ def main():
 
     # Analyze command
     analyze_parser = subparsers.add_parser("analyze", help="Analyze recorded data")
-    analyze_parser.add_argument("-f", "--file", type=str, required=True, help="CSV file to analyze")
+    analyze_parser.add_argument("-f", "--file", type=str, required=True, help="MNE RAW file to analyze")
     analyze_parser.add_argument("-c", "--config", type=str, help="Analysis YAML config file")
     analyze_parser.add_argument("-s", "--start", type=float, default=0.0, help="Start time (sec)")
     analyze_parser.add_argument("-d", "--duration", type=float, default=60.0, help="Duration (sec)")
     analyze_parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
 
     # Analyze_contrast command
-    analyze_contrast_parser = subparsers.add_parser("analyze_contrast", help="Analyze data by contrast")
-    analyze_contrast_parser.add_argument("--fot", type=Path, required=True,help="CSV file for FOT condition",)
-    analyze_contrast_parser.add_argument("--ifnfn", type=Path, required=True,help="CSV file for IFNFN condition",)
+    analyze_contrast_parser = subparsers.add_parser("analyze_contrast", help="TFR Contrast Analysis (Section 9 Pipeline)")
+    analyze_contrast_parser.add_argument("--fot", type=Path, required=True,help="MNE RAW file for FOT condition",)
+    analyze_contrast_parser.add_argument("--ifnfn", type=Path, required=True,help="MNE RAW file for IFNFN condition",)
     analyze_contrast_parser.add_argument("--config", type=Path, default=None,help="Analysis YAML config (optional)",)
     analyze_contrast_parser.add_argument("--output", type=Path, default=Path("reports"),help="Output directory for report",)
+
+    convert = subparsers.add_parser("convert", help="Convert CSV to RAW")
+    convert.add_argument("-f", "--file", type=str, required=True, help="CSV file path")
+    convert.add_argument("-c", "--config", type=str, required=True, help="Configuration file path")
+    convert.add_argument("-o", "--output-dir", type=str, required=True, help="RAW output directory")
+    convert.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
 
     args = parser.parse_args()
 
@@ -66,11 +72,11 @@ def main():
         config_path = Path(args.config)
         from src.utils.config import load_yaml
         config = load_yaml(config_path)
-        
+
         # Add montage path to config if provided
         if args.montage:
             config["montage_path"] = args.montage
-            
+
         server = LSLServer(config)
         server.run()
 
@@ -97,7 +103,7 @@ def main():
             analysis_config_path = Path(args.config)
         else:
             analysis_config_path = CONFIG_DIR / "analysis" / "default_offline.yaml"
-            
+
         config = load_yaml(analysis_config_path) if analysis_config_path.exists() else {}
 
         # Check if user manually specified channels in the YAML
@@ -119,7 +125,7 @@ def main():
         from src.analysis.offline.tfr_contrast import TFRContrastAnalyzer, TFRContrastConfig
 
         # Build config from YAML if provided, otherwise use defaults
-        if args.config and args.config.exists():
+        if args.config:
             from src.utils.config import load_yaml
             cfg = TFRContrastConfig.from_yaml(load_yaml(args.config))
         else:
@@ -132,7 +138,7 @@ def main():
             if profile_path.exists():
                 cfg.apply_montage_yaml(profile_path, overwrite=False)
             else:
-                logger.warning("Montage profile '%s' not found at %s", 
+                logger.warning("Montage profile '%s' not found at %s",
                                cfg.montage_profile, profile_path)
 
         output_dir = args.output
@@ -158,8 +164,12 @@ def main():
         report_path = analyzer.generate_report(output_dir=output_dir)
         print(f"Report: {report_path}")
 
+    elif args.command == "convert":
+        from src.converting.convert import read_yaml_config, mne_from_brainflow, write_raw
 
-
+        config = read_yaml_config(args)
+        raw = mne_from_brainflow(args, config)
+        write_raw(args, raw)
 
     else:
         parser.print_help()

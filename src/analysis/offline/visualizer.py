@@ -139,53 +139,12 @@ class EEGVisualizer:
         else:
             logger.warning("Montage profile '%s' not found at %s", profile, profile_path)
 
-    def load_data(self, csv_file: Path):
+    def load_data(self, raw_file: Path):
         """Loads CSV data and creates MNE object."""
-        df = pd.read_csv(csv_file, header=None)
-        
-        # Format: [timestamp, Ch1...Ch32, marker]
-        timestamps = df.iloc[:, 0].values
-        eeg_data = df.iloc[:, 1:33].values.T * 1e6 # To microvolts
-        markers = df.iloc[:, 33].values
-        
-        # Calculate sfreq
-        if len(timestamps) > 1:
-            self.sfreq = 1.0 / np.median(np.diff(timestamps))
-        else:
-            self.sfreq = 512.0 # Fallback
-            
-        num_channels = eeg_data.shape[0]
-        
-        ch_names = self.config.get('channels', [f'Ch{i+1}' for i in range(num_channels)])
-        # Ensure channel name count matches data
-        if len(ch_names) > num_channels:
-            ch_names = ch_names[:num_channels]
-        elif len(ch_names) < num_channels:
-            logger.warning("Fewer channel names than data columns. Padding with NC.")
-            ch_names += [f'NC{i+1}' for i in range(len(ch_names), num_channels)]
-            
-        info = mne.create_info(ch_names=ch_names, sfreq=self.sfreq, ch_types='eeg')
-        self.raw = mne.io.RawArray(eeg_data, info)
-        
-        # Drop all channels with 'NC' in the name (to handle duplicates like NC-0)
-        to_drop = [ch for ch in self.raw.ch_names if 'NC' in ch]
-        if to_drop:
-            self.raw.drop_channels(to_drop, on_missing='ignore')
-            logger.info("Dropped unconnected channels (NC): %s", len(to_drop))
-        
-        # Set montage if specified in config
-        montage_name = self.config.get('montage')
-        if montage_name:
-            try:
-                montage = mne.channels.make_standard_montage(montage_name)
-                self.raw.set_montage(montage, on_missing='warn')
-                logger.info("Applied montage: %s", montage_name)
-            except Exception as e:
-                logger.warning("Could not apply montage %s: %s", montage_name, e)
 
-        # Add annotations
-        self._add_annotations(timestamps, markers)
-
+        self.raw = mne.io.read_raw_fif(raw_file, preload=True) 
+        
+        
         # Apply virtual channels (e.g. Laplacian) before picking
         self._apply_virtual_channels()
 
