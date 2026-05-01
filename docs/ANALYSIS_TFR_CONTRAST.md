@@ -51,11 +51,18 @@ The system uses a condition-aware marking scheme to distinguish between trial ty
 ### Standalone Command
 You can run the analysis directly on raw CSV files:
 
-```bash
-python -m src.analysis.offline.tfr_contrast \
-    --fot  data/raw/SUBJECT_FOT.csv \
-    --ifnfn data/raw/SUBJECT_IFNFN.csv \
+```powershell
+python -m src.analysis.offline.tfr_contrast `
+    --fot  data/raw/SUBJECT_FOT.csv `
+    --ifnfn data/raw/SUBJECT_IFNFN.csv `
     --config config/analysis/contrast_offline.yaml
+
+example:
+python -m src.analysis.offline.tfr_contrast \                                     
+     --fot  "G:\My Drive\SharedData\data\raw\260406-1313_None_c6_f42_v100.csv" \
+     --ifnfn "G:\My Drive\SharedData\data\raw\260406-1259_None_c5_f42_v100.csv" \
+     --config "D:\F2H_code\GH\EEGsuite\config\analysis\default_offline.yaml"
+
 ```
 
 ### Main CLI Integration
@@ -65,11 +72,18 @@ If integrated into `main.py`, use the `contrast` subcommand:
 python -m src.main contrast --fot FOT.csv --ifnfn IFNFN.csv
 ```
 
-### Single Condition Mode
-To analyze a single file without contrasting (useful for checking signal quality):
+### Single Condition Mode (Quick Inspection)
+To analyze a single file without contrasting (useful for checking signal quality or when a contrast file is not yet available):
 
-```bash
-python -m src.analysis.offline.tfr_contrast --fot data/raw/SINGLE_FILE.csv --ifnfn data/raw/SINGLE_FILE.csv
+```powershell
+python -m src.analysis.offline.tfr_contrast --fot data/raw/SINGLE_FILE.csv
+```
+
+### Interleaved Single-File mode
+If you have a single recording that contains BOTH FOT (marker 101) and IFNFN (marker 201) trials interleaved, just specify the file once or twice:
+
+```powershell
+python -m src.analysis.offline.tfr_contrast --fot interleaved.csv --ifnfn interleaved.csv
 ```
 
 ---

@@ -153,10 +153,10 @@ python -m src.main analyze -f "data/raw/YOUR_FILE.csv" -s 0 -d 60
 4.  **Contrasting:** Compute **Mean TFR(FOT) - Mean TFR(IFNFN)**.
     run the analysis directly on raw CSV files:
 
-```bash
-python -m src.analysis.offline.tfr_contrast \
-    --fot  data/raw/SUBJECT_FOT.csv \
-    --ifnfn data/raw/SUBJECT_IFNFN.csv \
+```powershell
+python -m src.analysis.offline.tfr_contrast `
+    --fot  data/raw/SUBJECT_FOT.csv `
+    --ifnfn data/raw/SUBJECT_IFNFN.csv `
     --config config/analysis/contrast_offline.yaml
 ```
 
