@@ -125,7 +125,7 @@ def main():
         from src.analysis.offline.tfr_contrast import TFRContrastAnalyzer, TFRContrastConfig
 
         # Build config from YAML if provided, otherwise use defaults
-        if args.config and args.config.exists():
+        if args.config:
             from src.utils.config import load_yaml
             cfg = TFRContrastConfig.from_yaml(load_yaml(args.config))
         else:
