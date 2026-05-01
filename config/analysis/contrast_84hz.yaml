@@ -1,0 +1,33 @@
+montage_profile: freg9
+
+# Filtering
+fmin: 5.0
+fmax: 220.0
+notch_freqs: [50, 100]
+
+# Stimulation frequency under analysis
+stim_freq: 84.0
+
+# TFR frequency range - up to just below Nyquist (256 Hz)
+tfr_fmin: 1.0
+tfr_fmax: 250.0
+tfr_fstep: 1.0
+
+# Epoching - 5s stim ON + 2s OFF, so +7s reaches the next Stim ON exactly
+epoch_tmin: -1.5
+epoch_tmax: 7.0
+baseline_tmin: -1.0
+baseline_tmax: -0.5
+stim_window_tmin: 0.5
+stim_window_tmax: 4.0
+
+# Visualization defaults
+default_start_time: 0.0
+default_duration: 10.0
+psd_fmin: 1.0
+psd_fmax: 250.0
+pick_channels: [T7, C3, T8, FC4, FC3, C4, CP3, CP4, Cz, S1_left, S1_right]
+
+erp_duration: 1.1
+
+output_dir: "reports"
