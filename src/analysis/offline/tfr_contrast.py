@@ -27,6 +27,7 @@ Usage (from main.py):
 
 import logging
 import html
+import gc
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
@@ -100,7 +101,7 @@ class TFRContrastConfig:
     tfr_fstep: float = 1.0
     n_cycles_mode: str = "adaptive"  # "adaptive" = freqs/2, or fixed int
     n_cycles_fixed: float = 7.0
-    tfr_decim: int = 1  # decimation factor (auto if 0)
+    tfr_decim: int = 0  # decimation factor (auto if 0)
 
     # --- Epoching windows (seconds, relative to STIM-ON) ---
     epoch_tmin: float = -1.5  # start of epoch (must include baseline)
@@ -401,17 +402,26 @@ class TFRContrastAnalyzer:
         # Auto-decimation for memory
         decim = self.cfg.tfr_decim
         if decim == 0:
-            decim = max(1, int(raw.info["sfreq"] / 200))
+            # Target ~150Hz for TFR sampling rate. This is plenty for
+            # visualization and analysis of power envelopes.
+            # Wavelet convolution itself happens at raw sfreq.
+            target_sfreq = 150.0
+            decim = max(1, int(raw.info["sfreq"] / target_sfreq))
 
+        logger.info("Computing TFR (decim=%d, average=True)...", decim)
         power = epochs.compute_tfr(
             method=self.cfg.tfr_method,
             freqs=freqs,
             n_cycles=n_cycles,
             decim=decim,
             return_itc=False,
+            average=True,  # Average across epochs to save memory
             n_jobs=1,
             verbose=False,
         )
+
+        # Convert to float32 to save 50% memory (sufficient for EEG analysis)
+        power.data = power.data.astype(np.float32)
 
         # --- Step 3: Baseline normalization on the TFR ---
         power.apply_baseline(
@@ -419,9 +429,6 @@ class TFRContrastAnalyzer:
             mode=self.cfg.baseline_mode,
             verbose=False,
         )
-
-        # Average across all epochs → AverageTFR (channels × freqs × times)
-        power = power.average()
 
         logger.info(
             "TFR computed & normalized (%s, baseline [%.1f, %.1f]s) for '%s'.",
@@ -666,14 +673,16 @@ class TFRContrastAnalyzer:
         ch_idx = self.tfr_fot.ch_names.index(ch)
         time_mask = (self.tfr_fot.times >= _tmin) & (self.tfr_fot.times <= _tmax)
         freq_mask = (self.tfr_fot.freqs >= _fmin) & (self.tfr_fot.freqs <= _fmax)
-        all_data = np.concatenate(
-            [
-                self.tfr_fot.data[ch_idx, freq_mask, :][:, time_mask].ravel(),
-                self.tfr_ifnfn.data[ch_idx, freq_mask, :][:, time_mask].ravel(),
-                self.tfr_contrast.data[ch_idx, freq_mask, :][:, time_mask].ravel(),
-            ]
+
+        # Compute scaling without large concatenations
+        d1 = self.tfr_fot.data[ch_idx, freq_mask, :][:, time_mask]
+        d2 = self.tfr_ifnfn.data[ch_idx, freq_mask, :][:, time_mask]
+        d3 = self.tfr_contrast.data[ch_idx, freq_mask, :][:, time_mask]
+        abs_max = max(
+            np.percentile(np.abs(d1), 97),
+            np.percentile(np.abs(d2), 97),
+            np.percentile(np.abs(d3), 97),
         )
-        abs_max = np.percentile(np.abs(all_data), 97)
 
         fig, axes = plt.subplots(1, 3, figsize=(22, 5))
 
@@ -906,6 +915,8 @@ class TFRContrastAnalyzer:
                         )
                         + "</details>"
                     )
+                # Force cleanup after each channel figure
+                gc.collect()
 
         # --- Section 4: Band time-courses (collapsible, grouped by band) ---
         band_plots = ""

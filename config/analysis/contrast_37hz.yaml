@@ -6,17 +6,17 @@ fmax: 250.0
 notch_freqs: [50, 100]
 
 # Stimulation frequency under analysis
-stim_freq: 42.0
+stim_freq: 72.0
 
 # TFR frequency range - up to just below Nyquist (256 Hz)
 tfr_fmin: 20.0
 tfr_fmax: 220.0
 tfr_fstep: 1.0
-tfr_decim: 0
+tfr_decim: 0  # auto-decimate for memory efficiency
 
-# Epoching - 5s stim ON + 2s OFF, so +7s reaches the next Stim ON exactly
+# Epoching - 5s stim ON + 2*2.5s OFF, so +10s reaches the next Stim ON exactly
 epoch_tmin: -1.5
-epoch_tmax: 7.0
+epoch_tmax: 10.0
 baseline_tmin: -1.0
 baseline_tmax: -0.5
 stim_window_tmin: 0.5
