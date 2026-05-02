@@ -1,10 +1,10 @@
 Channel:
-  Start: 5  
-  End: 5
+  Start: 6  
+  End: 6
   Steps: 1
 
-# Ch 6 = TACTOR 1 for FOT
-# Ch 5 = TACTOR 2 for IFNFN (REMOVED NIPPLE)
+# Ch 6 = TACTOR 1 for FOT - Brown-White
+# Ch 5 = TACTOR 2 for IFNFN (REMOVED NIPPLE) - Blue
 
 Volume:
   Start: 100     
@@ -34,6 +34,6 @@ Baselines:
   Baseline_3: 5
 
 Measurements:
-  Number: 3 # should be 50-100, 3 is for testing
+  Number: 50 # should be 50-100, 3 is for testing
   Duration_on: 5
   Duration_off: 2

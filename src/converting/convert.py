@@ -1,4 +1,17 @@
-"""Convert CSV to RAW."""
+"""
+Convert CSV to RAW.
+
+typical usage:
+$ python -m src.main convert -f data/raw/260406-1259_None_baseline_NO_CONTACT.csv -c config/montages/freg9.yaml -o /tmp
+Note: NumExpr detected 22 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 16.
+NumExpr defaulting to 16 threads.
+/home/wgodefro/delme/EEGsuite/src/converting/convert.py:62: RuntimeWarning: Channel names are not unique, found duplicates for: {'NC'}. Applying running numbers for duplicates.
+  info = mne.create_info(
+Found 2 annotations
+Writing /tmp/260406-1259_None_baseline_NO_CONTACT_eeg.fif.gz
+Closing /tmp/260406-1259_None_baseline_NO_CONTACT_eeg.fif.gz
+[done]
+"""
 
 import logging
 from pathlib import Path
@@ -47,14 +60,14 @@ def mne_from_brainflow(args, config):
     csv_file = args.file
     data_in = pd.read_csv(csv_file, header=None).values.T
 
-    # Convert from brainflow (V) to MNE (uV)
     timestamps = data_in[0]
 
+    # Convert from brainflow (V) to MNE (uV)
     data = data_in[1 : len(config["channels"]) + 1] * 1e-6
     markers = data_in[len(config["channels"]) + 1]
 
     ch_types = ["eeg"] * len(config["channels"])  # Assuming all are EEG channels
-    sfreq = 512
+    sfreq = config["sfreq"]
     info = mne.create_info(
         ch_names=config["channels"],
         sfreq=sfreq,
