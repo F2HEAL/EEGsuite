@@ -6,6 +6,7 @@ name: FREG9
 reference: "M1 + M2 (linked)"
 VCM_Bias: "GND, between Fpz and Fz"
 montage: standard_1020
+sfreq: 512
 channels: [
     T7,   # CH1
     C3,   # CH2
