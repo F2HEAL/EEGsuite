@@ -37,10 +37,16 @@ import pandas as pd
 import mne
 import matplotlib
 import matplotlib.pyplot as plt
+from pyprep.prep_pipeline import PrepPipeline
 
 matplotlib.use("Agg")
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+RANDOM_SEED: int = 42
 
 # ---------------------------------------------------------------------------
 # Marker definitions - must match the recording module (sweep.py)
@@ -94,6 +100,10 @@ class TFRContrastConfig:
     pick_channels: Optional[List[str]] = None
     virtual_channels: Optional[Dict[str, Any]] = None
 
+    # --- PREP preprocessing parameters ---
+    prep_ransac: bool = True
+    prep_channel_wise: bool = True
+
     # --- TFR parameters ---
     tfr_method: str = "morlet"
     tfr_fmin: float = 1.0
@@ -109,13 +119,19 @@ class TFRContrastConfig:
     baseline_tmin: float = -1.0  # baseline window start
     baseline_tmax: float = -0.5  # baseline window end
     stim_window_tmin: float = 0.5  # stimulation analysis window start
-    stim_window_tmax: float = 4.0  # stimulation analysis window end
+    stim_window_tmax: float = 5.0  # stimulation analysis window end
 
     # --- Baseline normalization ---
     baseline_mode: str = "logratio"  # "logratio", "ratio", "percent", "zscore"
+    contrast_mode: str = "ratio"  # "ratio" (subtract ratios/dB), "absolute" (subtract raw power)
+
+    # --- Artifact rejection ---
+    # Maximum peak-to-peak amplitude in microvolts. Epochs exceeding this
+    # will be dropped. Set to 0 to disable.
+    reject_p2p: float = 0
 
     # --- Stimulation frequency (for summary analysis) ---
-    stim_freq: float = 42.0  # Hz — must match your VHP protocol
+    stim_freq: float = 32.0  # Hz — must match your VHP protocol
 
     # --- Filtering ---
     fmin: float = 0.5
@@ -214,6 +230,9 @@ class TFRContrastAnalyzer:
         self.tfr_fot = None  # AverageTFR after baseline norm
         self.tfr_ifnfn = None
         self.tfr_contrast = None  # FOT − IFNFN
+        self.psd_fot = None  # Spectrum after averaging
+        self.psd_ifnfn = None
+        self.psd_contrast = None  # Spectrum contrast (FOT - IFNFN)
 
     # ------------------------------------------------------------------
     # Data loading
@@ -281,8 +300,8 @@ class TFRContrastAnalyzer:
                 # Laplacian = Base - (WeightedSum / Divisor)
                 virtual_data = base_data - (ref_sum / divisor)
 
-                # Add to Raw object
-                info = mne.create_info([name], raw.info["sfreq"], ch_types=["eeg"])
+                # Add to Raw object as 'misc' type (not EEG, so doesn't need montage)
+                info = mne.create_info([name], raw.info["sfreq"], ch_types=["misc"])
                 new_raw = mne.io.RawArray(
                     virtual_data[np.newaxis, :], info, verbose=False
                 )
@@ -304,25 +323,90 @@ class TFRContrastAnalyzer:
     # ------------------------------------------------------------------
     # Step 0: Preprocessing
     # ------------------------------------------------------------------
-    def preprocess(self, raw: mne.io.RawArray) -> mne.io.RawArray:
-        """Band-pass filter and optional notch."""
-        raw_filtered = raw.copy()
-        raw_filtered.filter(
-            l_freq=self.cfg.fmin,
-            h_freq=self.cfg.fmax,
-            verbose=False,
+    def preprocess(self, raw: mne.io.RawArray, label: str = "data") -> mne.io.RawArray:
+        """
+        Apply PREP (Preprocessing Pipeline) robust reference.
+
+        Args:
+            raw: MNE Raw object.
+            label: Condition label for logging.
+
+        Returns:
+            Preprocessed Raw object with re-reference and filtering applied.
+        """
+        logger.info("Running PREP pipeline for %s...", label)
+
+        # Temporarily separate virtual (misc/non-eeg) channels from EEG for PREP
+        # In tfr_contrast, virtual channels are created as 'eeg' type sometimes.
+        # We need to ensure we only run PREP on channels that have locations.
+        misc_channels = {}
+        eeg_only_raw = raw.copy()
+        
+        # Identify non-eeg channels or virtual channels that shouldn't be in PREP
+        # Note: PrepPipeline needs a montage to work.
+        for ch_name in raw.ch_names:
+            ch_type = raw.get_channel_types([ch_name])[0]
+            if ch_type != "eeg":
+                misc_channels[ch_name] = raw.get_data(picks=[ch_name])
+        
+        if misc_channels:
+            logger.info("Temporarily removing %d non-eeg/virtual channels for PREP", 
+                       len(misc_channels))
+            eeg_only_raw.drop_channels(list(misc_channels.keys()))
+        
+        # Check if we have enough channels for RANSAC (requires 16+)
+        n_eeg_channels = len([ch for ch in eeg_only_raw.get_channel_types() 
+                              if ch == "eeg"])
+        use_ransac = self.cfg.prep_ransac and n_eeg_channels >= 16
+        
+        if self.cfg.prep_ransac and n_eeg_channels < 16:
+            logger.warning(
+                "Only %d EEG channels available; RANSAC requires 16+. "
+                "Disabling RANSAC and using standard re-referencing.", 
+                n_eeg_channels
+            )
+        
+        try:
+            montage = mne.channels.make_standard_montage(self.cfg.montage)
+        except Exception as e:
+            logger.warning("Could not load montage %s: %s. Using default.",
+                          self.cfg.montage, e)
+            montage = None
+
+        prep_params = {
+            "ref_chs": "eeg",
+            "reref_chs": "eeg",
+            "line_freqs": self.cfg.notch_freqs,
+        }
+
+        prep = PrepPipeline(
+            eeg_only_raw,
+            prep_params,
+            montage,
+            ransac=use_ransac,
+            channel_wise=self.cfg.prep_channel_wise,
+            random_state=RANDOM_SEED,
         )
-        if self.cfg.notch_freqs:
-            valid_notch = [f for f in self.cfg.notch_freqs if f < self.cfg.fmax]
-            if valid_notch:
-                raw_filtered.notch_filter(valid_notch, verbose=False)
-        logger.info(
-            "Preprocessed: band-pass %.1f–%.1f Hz, notch %s",
-            self.cfg.fmin,
-            self.cfg.fmax,
-            self.cfg.notch_freqs,
-        )
-        return raw_filtered
+
+        prep.fit()
+        raw_clean = prep.raw
+
+        logger.info("Applying filter: %.1f–%.1f Hz", self.cfg.fmin, self.cfg.fmax)
+        raw_clean.filter(self.cfg.fmin, self.cfg.fmax, verbose=False)
+
+        # Re-add virtual channels
+        if misc_channels:
+            logger.info("Re-adding %d channels after PREP", 
+                       len(misc_channels))
+            for ch_name, ch_data in misc_channels.items():
+                # Get the original type
+                orig_type = raw.get_channel_types([ch_name])[0]
+                info = mne.create_info([ch_name], raw_clean.info["sfreq"],
+                                       ch_types=[orig_type])
+                virtual_raw = mne.io.RawArray(ch_data, info, verbose=False)
+                raw_clean.add_channels([virtual_raw], force_update_info=True)
+
+        return raw_clean
 
     # ------------------------------------------------------------------
     # Steps 1–3: TFR → Epoch → Baseline normalize
@@ -331,13 +415,15 @@ class TFRContrastAnalyzer:
         self,
         raw: mne.io.RawArray,
         event_name: str,
-    ) -> Optional[mne.time_frequency.AverageTFR]:
+        apply_baseline: bool = True,
+    ) -> Tuple[Optional[mne.time_frequency.AverageTFR], Optional[mne.time_frequency.Spectrum]]:
         """
         For one condition:
           1. Create epochs around *event_name* triggers.
           2. Compute Morlet TFR on epochs.
-          3. Apply baseline normalization.
-          4. Return the averaged (across trials) TFR.
+          3. Apply baseline normalization (if apply_baseline is True).
+          4. Compute PSD on the stimulation window.
+          5. Return (TFR, Spectrum).
         """
         if raw is None:
             logger.error("Raw data is None - cannot compute TFR.")
@@ -374,6 +460,11 @@ class TFRContrastAnalyzer:
             return None
 
         # --- Step 2: Epoching ---
+        reject = None
+        if self.cfg.reject_p2p > 0:
+            # MNE expects values in Volts, our config uses microVolts
+            reject = {"eeg": self.cfg.reject_p2p * 1e-6}
+
         epochs = mne.Epochs(
             raw,
             events,
@@ -381,6 +472,7 @@ class TFRContrastAnalyzer:
             tmin=self.cfg.epoch_tmin,
             tmax=self.cfg.epoch_tmax,
             baseline=None,  # We apply TFR-level baseline later
+            reject=reject,
             preload=True,
             verbose=False,
             on_missing="warning",
@@ -414,6 +506,7 @@ class TFRContrastAnalyzer:
             freqs=freqs,
             n_cycles=n_cycles,
             decim=decim,
+            picks="all",
             return_itc=False,
             average=True,  # Average across epochs to save memory
             n_jobs=1,
@@ -424,20 +517,38 @@ class TFRContrastAnalyzer:
         power.data = power.data.astype(np.float32)
 
         # --- Step 3: Baseline normalization on the TFR ---
-        power.apply_baseline(
-            baseline=(self.cfg.baseline_tmin, self.cfg.baseline_tmax),
-            mode=self.cfg.baseline_mode,
+        if apply_baseline:
+            power.apply_baseline(
+                baseline=(self.cfg.baseline_tmin, self.cfg.baseline_tmax),
+                mode=self.cfg.baseline_mode,
+                verbose=False,
+            )
+
+            logger.info(
+                "TFR computed & normalized (%s, baseline [%.1f, %.1f]s) for '%s'.",
+                self.cfg.baseline_mode,
+                self.cfg.baseline_tmin,
+                self.cfg.baseline_tmax,
+                event_name,
+            )
+        else:
+            logger.info("TFR computed (absolute power) for '%s'.", event_name)
+
+        # --- PSD calculation on stimulation window ---
+        logger.info("Computing PSD on stimulation window...")
+        # Use Welch or Multitaper. MNE compute_psd uses Welch by default.
+        spectrum = epochs.compute_psd(
+            method="welch",
+            fmin=20.0,
+            fmax=200.0,
+            tmin=self.cfg.stim_window_tmin,
+            tmax=self.cfg.stim_window_tmax,
+            picks="all",
             verbose=False,
         )
+        psd_avg = spectrum.average()
 
-        logger.info(
-            "TFR computed & normalized (%s, baseline [%.1f, %.1f]s) for '%s'.",
-            self.cfg.baseline_mode,
-            self.cfg.baseline_tmin,
-            self.cfg.baseline_tmax,
-            event_name,
-        )
-        return power
+        return power, psd_avg
 
     # ------------------------------------------------------------------
     # Step 4: Contrast
@@ -456,25 +567,48 @@ class TFRContrastAnalyzer:
             return False
 
         # Preprocess
-        raw_fot_clean = self.preprocess(self.raw_fot)
-        raw_ifnfn_clean = self.preprocess(self.raw_ifnfn)
+        raw_fot_clean = self.preprocess(self.raw_fot, label="FOT")
+        raw_ifnfn_clean = self.preprocess(self.raw_ifnfn, label="IFNFN")
 
         # Steps 1–3 per condition
-        self.tfr_fot = self.compute_condition_tfr(raw_fot_clean, self.cfg.fot_event)
-        self.tfr_ifnfn = self.compute_condition_tfr(
-            raw_ifnfn_clean, self.cfg.ifnfn_event
-        )
-
-        if self.tfr_fot is None or self.tfr_ifnfn is None:
-            logger.error(
-                "Pipeline incomplete - could not compute TFR for both conditions."
+        if self.cfg.contrast_mode == "absolute":
+            # Linear Subtraction Mode:
+            # We compute raw power, subtract them, and then (optionally)
+            # we'll still need to handle normalization for the final contrast
+            # to make the spectrogram readable.
+            self.tfr_fot, self.psd_fot = self.compute_condition_tfr(
+                raw_fot_clean, self.cfg.fot_event, apply_baseline=False
             )
-            return False
+            self.tfr_ifnfn, self.psd_ifnfn = self.compute_condition_tfr(
+                raw_ifnfn_clean, self.cfg.ifnfn_event, apply_baseline=False
+            )
 
-        # Step 4: Contrast = FOT - IFNFN
-        self.tfr_contrast = self.tfr_fot.copy()
-        self.tfr_contrast._data = self.tfr_fot.data - self.tfr_ifnfn.data
-        logger.info("Contrast TFR computed (FOT - IFNFN).")
+            # Step 4: Contrast = FOT(abs) - IFNFN(abs)
+            self.tfr_contrast = self.tfr_fot.copy()
+            self.tfr_contrast._data = self.tfr_fot.data - self.tfr_ifnfn.data
+            logger.info("Contrast TFR computed via Linear Subtraction (Absolute Power).")
+        else:
+            # Ratio/dB Mode (Default):
+            self.tfr_fot, self.psd_fot = self.compute_condition_tfr(
+                raw_fot_clean, self.cfg.fot_event, apply_baseline=True
+            )
+            self.tfr_ifnfn, self.psd_ifnfn = self.compute_condition_tfr(
+                raw_ifnfn_clean, self.cfg.ifnfn_event, apply_baseline=True
+            )
+
+            # Step 4: Contrast = FOT(normalized) - IFNFN(normalized)
+            self.tfr_contrast = self.tfr_fot.copy()
+            self.tfr_contrast._data = self.tfr_fot.data - self.tfr_ifnfn.data
+            logger.info("Contrast TFR computed via Ratio Subtraction (dB/LogRatio).")
+
+        # Step 5: PSD Contrast = FOT - IFNFN
+        if self.psd_fot is not None and self.psd_ifnfn is not None:
+            self.psd_contrast = self.psd_fot.copy()
+            self.psd_contrast._data = (
+                self.psd_fot.get_data(picks="all") - self.psd_ifnfn.get_data(picks="all")
+            )
+            logger.info("Contrast PSD computed (FOT - IFNFN).")
+
         return True
 
     def run_single_condition(self, condition: str = "fot") -> bool:
@@ -488,11 +622,15 @@ class TFRContrastAnalyzer:
 
         if condition == "fot":
             raw_clean = self.preprocess(self.raw_fot)
-            self.tfr_fot = self.compute_condition_tfr(raw_clean, self.cfg.fot_event)
+            self.tfr_fot, self.psd_fot = self.compute_condition_tfr(
+                raw_clean, self.cfg.fot_event, apply_baseline=True
+            )
             return self.tfr_fot is not None
         else:
             raw_clean = self.preprocess(self.raw_ifnfn)
-            self.tfr_ifnfn = self.compute_condition_tfr(raw_clean, self.cfg.ifnfn_event)
+            self.tfr_ifnfn, self.psd_ifnfn = self.compute_condition_tfr(
+                raw_clean, self.cfg.ifnfn_event, apply_baseline=True
+            )
             return self.tfr_ifnfn is not None
 
     # ------------------------------------------------------------------
@@ -713,6 +851,45 @@ class TFRContrastAnalyzer:
         plt.tight_layout()
         return fig
 
+    def plot_psd_comparison(self, channel: Optional[str] = None) -> plt.Figure:
+        """Plot PSD comparison (FOT, IFNFN, and Contrast) for a specific channel."""
+        if self.psd_fot is None or self.psd_ifnfn is None or self.psd_contrast is None:
+            return None
+
+        ch = channel or self.psd_fot.ch_names[0]
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+
+        freqs = self.psd_fot.freqs
+        # dB = 10 * log10(power)
+        psd_fot_db = 10 * np.log10(self.psd_fot.get_data(picks=[ch])[0])
+        psd_ifnfn_db = 10 * np.log10(self.psd_ifnfn.get_data(picks=[ch])[0])
+        # Use picks=[ch] here which is safe since psd_contrast now has all channels
+        psd_cont_lin = self.psd_contrast.get_data(picks=[ch])[0]
+
+        # Top plot: Condition Overlay (Log scale/dB)
+        ax1.plot(freqs, psd_fot_db, label="FOT (Tactile+EM)", color="blue", alpha=0.7)
+        ax1.plot(freqs, psd_ifnfn_db, label="IFNFN (EM Only)", color="red", alpha=0.7)
+        ax1.set_title(f"PSD Comparison: {ch}")
+        ax1.set_ylabel("Power (dB/Hz)")
+        ax1.grid(True, alpha=0.3)
+        ax1.legend()
+
+        # Bottom plot: Contrast (Linear scale to show subtraction clearly)
+        ax2.plot(freqs, psd_cont_lin, label="Contrast (FOT - IFNFN)", color="green", linewidth=1.5)
+        ax2.axhline(0, color="black", linestyle="-", alpha=0.3)
+        ax2.set_title("Contrast Spectrum (Neural Response)")
+        ax2.set_xlabel("Frequency (Hz)")
+        ax2.set_ylabel("Power Difference ($\mu V^2/Hz$)")
+        ax2.grid(True, alpha=0.3)
+        ax2.legend()
+
+        if hasattr(self.cfg, "stim_freq"):
+            for ax in [ax1, ax2]:
+                ax.axvline(self.cfg.stim_freq, color="orange", linestyle="--", alpha=0.5, label=f"Stim {self.cfg.stim_freq}Hz")
+
+        plt.tight_layout()
+        return fig
+
     def plot_stim_band_timecourse(
         self,
         freq_band: Tuple[float, float] = (20.0, 25.0),
@@ -918,7 +1095,24 @@ class TFRContrastAnalyzer:
                 # Force cleanup after each channel figure
                 gc.collect()
 
-        # --- Section 4: Band time-courses (collapsible, grouped by band) ---
+        # --- Section 4: PSD Comparison (collapsible) ---
+        psd_plots = ""
+        if self.psd_fot is not None and self.psd_ifnfn is not None:
+            for ch in ch_names:
+                fig_psd = self.plot_psd_comparison(channel=ch)
+                if fig_psd:
+                    psd_plots += (
+                        f"<details><summary><strong>PSD: {ch}</strong></summary>"
+                        + _fig_block(
+                            fig_psd,
+                            f"PSD_{ch}",
+                            f"Power Spectral Density (20&ndash;200 Hz) for {ch}",
+                        )
+                        + "</details>"
+                    )
+                gc.collect()
+
+        # --- Section 5: Band time-courses (collapsible, grouped by band) ---
         band_plots = ""
         if self.tfr_contrast is not None:
             stim_low = self.cfg.stim_freq - 5.0
@@ -1086,7 +1280,8 @@ table th, table td {{ padding: 8px 10px; }}
 <li><a href="#summary">Channel Response Summary</a></li>
 <li><a href="#methods">Methods &amp; Parameters</a></li>
 <li><a href="#overview">TFR Overview (FOT, IFNFN, Contrast)</a></li>
-<li><a href="#comparisons">Per-Channel Condition Comparisons</a></li>
+<li><a href="#comparisons">Per-Channel TFR Comparisons</a></li>
+<li><a href="#psd">Per-Channel PSD Comparisons</a></li>
 <li><a href="#timecourses">Band Time-Courses</a></li>
 <li><a href="#exports">Data Exports</a></li>
 </ol>
@@ -1112,6 +1307,8 @@ table th, table td {{ padding: 8px 10px; }}
         {montage_text}: {', '.join(ch_names)}</td></tr>
     <tr><td>TFR method</td><td>Morlet wavelets, {self.cfg.tfr_fmin}&ndash;{self.cfg.tfr_fmax} Hz
         (step {self.cfg.tfr_fstep} Hz), cycles: {self.cfg.n_cycles_mode}</td></tr>
+    <tr><td>Contrast Mode</td><td><strong>{self.cfg.contrast_mode.upper()}</strong> 
+        ({ "Subtracting baseline-normalized ratios" if self.cfg.contrast_mode == "ratio" else "Subtracting raw power (\u03BCV\u00B2)" })</td></tr>
     <tr><td>Baseline normalization</td><td>{self.cfg.baseline_mode},
         window [{self.cfg.baseline_tmin}, {self.cfg.baseline_tmax}]&nbsp;s</td></tr>
     <tr><td>Stimulation window</td><td>[{self.cfg.stim_window_tmin}, {self.cfg.stim_window_tmax}]&nbsp;s
@@ -1134,14 +1331,21 @@ Each subplot shows one channel; time is relative to stimulation onset (t&nbsp;=&
 
 <!-- ============================================================ -->
 <div class="section" id="comparisons">
-<h2><span class="sec-num">4.</span> Per-Channel Condition Comparisons</h2>
+<h2><span class="sec-num">4.</span> Per-Channel TFR Comparison</h2>
 <p>Side-by-side FOT, IFNFN, and Contrast TFR for each channel. Click to expand.</p>
 {comparison_plots}
 </div>
 
 <!-- ============================================================ -->
+<div class="section" id="psd">
+<h2><span class="sec-num">5.</span> Per-Channel PSD Comparison</h2>
+<p>Averaged Power Spectral Density (PSD) during the stimulation window (20&ndash;200 Hz). Click to expand.</p>
+{psd_plots}
+</div>
+
+<!-- ============================================================ -->
 <div class="section" id="timecourses">
-<h2><span class="sec-num">5.</span> Band Time-Courses</h2>
+<h2><span class="sec-num">6.</span> Band Time-Courses</h2>
 <p>Power averaged within frequency bands, plotted over time for each channel.
 Top panel: both conditions; bottom panel: contrast (isolated neural modulation).
 Click a band to expand, then click a channel.</p>
@@ -1150,7 +1354,7 @@ Click a band to expand, then click a channel.</p>
 
 <!-- ============================================================ -->
 <div class="section" id="exports">
-<h2><span class="sec-num">6.</span> Data Exports</h2>
+<h2><span class="sec-num">7.</span> Data Exports</h2>
 <div class="info-box neutral">
     <strong>{n_csv}</strong> CSV files exported to <code>csv/</code>
     &nbsp;|&nbsp; <strong>{plot_counter}</strong> high-resolution PNGs in <code>png/</code>
