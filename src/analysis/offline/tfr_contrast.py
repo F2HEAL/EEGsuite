@@ -879,7 +879,7 @@ class TFRContrastAnalyzer:
         ax2.axhline(0, color="black", linestyle="-", alpha=0.3)
         ax2.set_title("Contrast Spectrum (Neural Response)")
         ax2.set_xlabel("Frequency (Hz)")
-        ax2.set_ylabel("Power Difference ($\mu V^2/Hz$)")
+        ax2.set_ylabel("Power Difference (μV^2/Hz)")
         ax2.grid(True, alpha=0.3)
         ax2.legend()
 
