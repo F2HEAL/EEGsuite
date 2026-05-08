@@ -3,14 +3,15 @@ import sys
 import logging
 from pathlib import Path
 
+from src.utils.logger import setup_logger
+from src.utils.paths import initialize_directories, CONFIG_DIR, set_cloud_root
+from src.utils.config import EEGConfig
+
 # Add the project root to sys.path to allow 'from src...' imports
 root_dir = Path(__file__).resolve().parent.parent
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
-from src.utils.logger import setup_logger
-from src.utils.paths import initialize_directories, CONFIG_DIR, set_cloud_root
-from src.utils.config import EEGConfig
 
 def main():
     """Unified CLI for EEGsuite."""
@@ -44,8 +45,9 @@ def main():
     analyze_contrast_parser = subparsers.add_parser("analyze_contrast", help="TFR Contrast Analysis (Section 9 Pipeline)")
     analyze_contrast_parser.add_argument("--fot", type=Path, required=True,help="MNE RAW file for FOT condition",)
     analyze_contrast_parser.add_argument("--ifnfn", type=Path, required=True,help="MNE RAW file for IFNFN condition",)
-    analyze_contrast_parser.add_argument("--config", type=Path, default=None,help="Analysis YAML config (optional)",)
-    analyze_contrast_parser.add_argument("--output", type=Path, default=Path("reports"),help="Output directory for report",)
+    analyze_contrast_parser.add_argument("-c", "--config", type=Path, default=None,help="Analysis YAML config (optional)",)
+    analyze_contrast_parser.add_argument("-o", "--output", type=Path, default=Path("reports"),help="Output directory for report",)
+    analyze_contrast_parser.add_argument("-s", "--stimfreq", type=int, help="StimFreq in Hz")
 
     convert = subparsers.add_parser("convert", help="Convert CSV to RAW")
     convert.add_argument("-f", "--file", type=str, required=True, help="CSV file path")

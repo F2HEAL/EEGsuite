@@ -28,6 +28,7 @@ Usage (from main.py):
 import logging
 import html
 import gc
+import warnings
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
@@ -41,7 +42,37 @@ from pyprep.prep_pipeline import PrepPipeline
 
 matplotlib.use("Agg")
 
+# Improvement 2: Silence external libraries
+mne.set_log_level("WARNING")
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+pyprep_logger = logging.getLogger("pyprep")
+pyprep_logger.setLevel(logging.WARNING)
+
+
+# Filter out specific annoying pyprep messages that are redundant or misleading
+class PyPrepFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        if "Overwriting `ransac` value" in msg:
+            return False
+        return True
+
+
+pyprep_logger.addFilter(PyPrepFilter())
+
+# Also silence specific RuntimeWarnings from MNE/PyPREP regarding digitization points
+warnings.filterwarnings("ignore", message=".*head digitization points.*")
+
+# Improvement 1: Enhanced logging format for this script
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    _ch = logging.StreamHandler()
+    _formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S"
+    )
+    _ch.setFormatter(_formatter)
+    logger.addHandler(_ch)
+    logger.propagate = False  # Prevent double-logging to console via root logger
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -101,7 +132,7 @@ class TFRContrastConfig:
     virtual_channels: Optional[Dict[str, Any]] = None
 
     # --- PREP preprocessing parameters ---
-    prep_ransac: bool = True
+    prep_ransac: bool = False
     prep_channel_wise: bool = True
 
     # --- TFR parameters ---
@@ -123,7 +154,9 @@ class TFRContrastConfig:
 
     # --- Baseline normalization ---
     baseline_mode: str = "logratio"  # "logratio", "ratio", "percent", "zscore"
-    contrast_mode: str = "ratio"  # "ratio" (subtract ratios/dB), "absolute" (subtract raw power)
+    contrast_mode: str = (
+        "ratio"  # "ratio" (subtract ratios/dB), "absolute" (subtract raw power)
+    )
 
     # --- Artifact rejection ---
     # Maximum peak-to-peak amplitude in microvolts. Epochs exceeding this
@@ -240,12 +273,12 @@ class TFRContrastAnalyzer:
     def load_two_files(self, fot_path: Path, ifnfn_path: Path) -> None:
         """Load separate FOT and IFNFN recordings (fully-blocked protocol)."""
         logger.info("Loading FOT file: %s", fot_path)
-        self.raw_fot = mne.io.read_raw_fif(fot_path, preload=True)
+        self.raw_fot = mne.io.read_raw_fif(fot_path, preload=True, verbose=False)
         logger.info("Loading IFNFN file: %s", ifnfn_path)
-        self.raw_ifnfn = mne.io.read_raw_fif(ifnfn_path, preload=True)
-        # Apply virtual channels (e.g. Weighted Laplacian) before picking
-        self._apply_virtual_channels(self.raw_fot)
-        self._apply_virtual_channels(self.raw_ifnfn)
+        self.raw_ifnfn = mne.io.read_raw_fif(ifnfn_path, preload=True, verbose=False)
+        # # Apply virtual channels (e.g. Weighted Laplacian) before picking
+        # self._apply_virtual_channels(self.raw_fot)
+        # self._apply_virtual_channels(self.raw_ifnfn)
 
         self._apply_picks(self.raw_fot)
         self._apply_picks(self.raw_ifnfn)
@@ -256,7 +289,7 @@ class TFRContrastAnalyzer:
         (alternating or randomized protocol).  Condition is determined
         by marker codes 101/201.
         """
-        raw = mne.io.read_raw_fif(raw_path, preload=True)
+        raw = mne.io.read_raw_fif(raw_path, preload=True, verbose=False)
         self._apply_virtual_channels(raw)
         self._apply_picks(raw)
         # Both conditions share the same Raw — epoching separates them
@@ -317,7 +350,7 @@ class TFRContrastAnalyzer:
         if picks:
             valid = [ch for ch in picks if ch in raw.ch_names]
             if valid:
-                raw.pick(valid)
+                raw.pick(valid, verbose=False)
                 logger.info("Picked channels: %s", valid)
 
     # ------------------------------------------------------------------
@@ -336,42 +369,48 @@ class TFRContrastAnalyzer:
         """
         logger.info("Running PREP pipeline for %s...", label)
 
-        # Temporarily separate virtual (misc/non-eeg) channels from EEG for PREP
-        # In tfr_contrast, virtual channels are created as 'eeg' type sometimes.
-        # We need to ensure we only run PREP on channels that have locations.
+        # 1. Identify channels for PREP: Must be 'eeg' AND in montage
+        try:
+            montage = mne.channels.make_standard_montage(self.cfg.montage)
+            montage_ch_names = montage.ch_names
+        except Exception:
+            montage = None
+            montage_ch_names = []
+
         misc_channels = {}
         eeg_only_raw = raw.copy()
-        
+
         # Identify non-eeg channels or virtual channels that shouldn't be in PREP
         # Note: PrepPipeline needs a montage to work.
         for ch_name in raw.ch_names:
             ch_type = raw.get_channel_types([ch_name])[0]
-            if ch_type != "eeg":
+            if ch_type != "eeg" or (montage and ch_name not in montage_ch_names):
                 misc_channels[ch_name] = raw.get_data(picks=[ch_name])
-        
+
         if misc_channels:
-            logger.info("Temporarily removing %d non-eeg/virtual channels for PREP", 
-                       len(misc_channels))
+            logger.info(
+                "Temporarily removing %d non-eeg/virtual/off-montage channels for PREP: %s",
+                len(misc_channels),
+                list(misc_channels.keys()),
+            )
             eeg_only_raw.drop_channels(list(misc_channels.keys()))
-        
+
+        # 2. PREP works best on data high-passed at 1Hz (recommended by pyprep)
+        logger.info("Applying 1Hz highpass for PREP robustness...")
+        eeg_only_raw.filter(l_freq=1.0, h_freq=None, verbose=False)
+
         # Check if we have enough channels for RANSAC (requires 16+)
-        n_eeg_channels = len([ch for ch in eeg_only_raw.get_channel_types() 
-                              if ch == "eeg"])
+        n_eeg_channels = len(
+            [ch for ch in eeg_only_raw.get_channel_types() if ch == "eeg"]
+        )
         use_ransac = self.cfg.prep_ransac and n_eeg_channels >= 16
-        
+
         if self.cfg.prep_ransac and n_eeg_channels < 16:
             logger.warning(
                 "Only %d EEG channels available; RANSAC requires 16+. "
-                "Disabling RANSAC and using standard re-referencing.", 
-                n_eeg_channels
+                "Disabling RANSAC and using standard re-referencing.",
+                n_eeg_channels,
             )
-        
-        try:
-            montage = mne.channels.make_standard_montage(self.cfg.montage)
-        except Exception as e:
-            logger.warning("Could not load montage %s: %s. Using default.",
-                          self.cfg.montage, e)
-            montage = None
 
         prep_params = {
             "ref_chs": "eeg",
@@ -391,18 +430,58 @@ class TFRContrastAnalyzer:
         prep.fit()
         raw_clean = prep.raw
 
+        # 3. INTERPOLATION: Crucial to keep channel set consistent
+        logger.info("Interpolating bad channels found by PREP...")
+        raw_clean.interpolate_bads(reset_bads=True)
+
+        # Log useful information from PREP results
+        logger.info("PREP pipeline results for %s:", label)
+
+        # 1. Reference channels
+        ref_chs = getattr(prep, "reference_channels", [])
+        logger.info("  - Reference channels: %s", ref_chs)
+
+        # 2. Noisy channels (before interpolation)
+        bad_dict = getattr(prep, "noisy_channels_before", {})
+        all_bad = set()
+        if bad_dict:
+            for category, channels in bad_dict.items():
+                if channels:
+                    logger.info("  - Bad by %s: %s", category, channels)
+                    all_bad.update(channels)
+
+        # 3. RANSAC specific (if enabled)
+        if use_ransac:
+            bad_after = getattr(prep, "noisy_channels_after", {})
+            ransac_bad = bad_after.get("bad_by_ransac", [])
+            if ransac_bad:
+                logger.info("  - Bad by RANSAC: %s", ransac_bad)
+                all_bad.update(ransac_bad)
+
+        # 4. Final summary
+        interp_chs = getattr(prep, "interpolated_channels", [])
+        if interp_chs:
+            logger.info(
+                "  - Interpolated channels (%d): %s", len(interp_chs), interp_chs
+            )
+        else:
+            logger.info("  - No channels interpolated.")
+
+        if not all_bad and not interp_chs:
+            logger.info("  - Data is clean (no bad channels detected).")
+
         logger.info("Applying filter: %.1f–%.1f Hz", self.cfg.fmin, self.cfg.fmax)
         raw_clean.filter(self.cfg.fmin, self.cfg.fmax, verbose=False)
 
         # Re-add virtual channels
         if misc_channels:
-            logger.info("Re-adding %d channels after PREP", 
-                       len(misc_channels))
+            logger.info("Re-adding %d channels after PREP", len(misc_channels))
             for ch_name, ch_data in misc_channels.items():
                 # Get the original type
                 orig_type = raw.get_channel_types([ch_name])[0]
-                info = mne.create_info([ch_name], raw_clean.info["sfreq"],
-                                       ch_types=[orig_type])
+                info = mne.create_info(
+                    [ch_name], raw_clean.info["sfreq"], ch_types=[orig_type]
+                )
                 virtual_raw = mne.io.RawArray(ch_data, info, verbose=False)
                 raw_clean.add_channels([virtual_raw], force_update_info=True)
 
@@ -416,7 +495,9 @@ class TFRContrastAnalyzer:
         raw: mne.io.RawArray,
         event_name: str,
         apply_baseline: bool = True,
-    ) -> Tuple[Optional[mne.time_frequency.AverageTFR], Optional[mne.time_frequency.Spectrum]]:
+    ) -> Tuple[
+        Optional[mne.time_frequency.AverageTFR], Optional[mne.time_frequency.Spectrum]
+    ]:
         """
         For one condition:
           1. Create epochs around *event_name* triggers.
@@ -566,7 +647,6 @@ class TFRContrastAnalyzer:
             )
             return False
 
-        # Preprocess
         raw_fot_clean = self.preprocess(self.raw_fot, label="FOT")
         raw_ifnfn_clean = self.preprocess(self.raw_ifnfn, label="IFNFN")
 
@@ -586,7 +666,9 @@ class TFRContrastAnalyzer:
             # Step 4: Contrast = FOT(abs) - IFNFN(abs)
             self.tfr_contrast = self.tfr_fot.copy()
             self.tfr_contrast._data = self.tfr_fot.data - self.tfr_ifnfn.data
-            logger.info("Contrast TFR computed via Linear Subtraction (Absolute Power).")
+            logger.info(
+                "Contrast TFR computed via Linear Subtraction (Absolute Power)."
+            )
         else:
             # Ratio/dB Mode (Default):
             self.tfr_fot, self.psd_fot = self.compute_condition_tfr(
@@ -604,9 +686,9 @@ class TFRContrastAnalyzer:
         # Step 5: PSD Contrast = FOT - IFNFN
         if self.psd_fot is not None and self.psd_ifnfn is not None:
             self.psd_contrast = self.psd_fot.copy()
-            self.psd_contrast._data = (
-                self.psd_fot.get_data(picks="all") - self.psd_ifnfn.get_data(picks="all")
-            )
+            self.psd_contrast._data = self.psd_fot.get_data(
+                picks="all"
+            ) - self.psd_ifnfn.get_data(picks="all")
             logger.info("Contrast PSD computed (FOT - IFNFN).")
 
         return True
@@ -875,7 +957,13 @@ class TFRContrastAnalyzer:
         ax1.legend()
 
         # Bottom plot: Contrast (Linear scale to show subtraction clearly)
-        ax2.plot(freqs, psd_cont_lin, label="Contrast (FOT - IFNFN)", color="green", linewidth=1.5)
+        ax2.plot(
+            freqs,
+            psd_cont_lin,
+            label="Contrast (FOT - IFNFN)",
+            color="green",
+            linewidth=1.5,
+        )
         ax2.axhline(0, color="black", linestyle="-", alpha=0.3)
         ax2.set_title("Contrast Spectrum (Neural Response)")
         ax2.set_xlabel("Frequency (Hz)")
@@ -885,7 +973,13 @@ class TFRContrastAnalyzer:
 
         if hasattr(self.cfg, "stim_freq"):
             for ax in [ax1, ax2]:
-                ax.axvline(self.cfg.stim_freq, color="orange", linestyle="--", alpha=0.5, label=f"Stim {self.cfg.stim_freq}Hz")
+                ax.axvline(
+                    self.cfg.stim_freq,
+                    color="orange",
+                    linestyle="--",
+                    alpha=0.5,
+                    label=f"Stim {self.cfg.stim_freq}Hz",
+                )
 
         plt.tight_layout()
         return fig
