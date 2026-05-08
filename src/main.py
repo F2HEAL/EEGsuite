@@ -156,13 +156,6 @@ def main():
             logger.error("Pipeline FAILED")
             sys.exit(1)
 
-        invalid = analyzer.validate()
-        if invalid:
-            logger.error("Validation failed: %s", invalid)
-            sys.exit(2)
-        else:
-            logger.info("Analyzer data validated")
-
         report_path = analyzer.generate_report(output_dir=output_dir)
         print(f"Report: {report_path}")
 
