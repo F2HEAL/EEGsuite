@@ -25,19 +25,19 @@ Usage (from main.py):
         --ifnfn data/raw/250115-1200_IFNFN.csv
 """
 
-import logging
-import html
 import gc
+import html
+import logging
 import warnings
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
-import pandas as pd
-import mne
 import matplotlib
 import matplotlib.pyplot as plt
+import mne
+import numpy as np
+import pandas as pd
 from pyprep.prep_pipeline import PrepPipeline
 
 matplotlib.use("Agg")
@@ -274,13 +274,10 @@ class TFRContrastAnalyzer:
         """Load separate FOT and IFNFN recordings (fully-blocked protocol)."""
         logger.info("Loading FOT file: %s", fot_path)
         self.raw_fot = mne.io.read_raw_fif(fot_path, preload=True, verbose=False)
+        self._apply_picks(self.raw_fot)
+
         logger.info("Loading IFNFN file: %s", ifnfn_path)
         self.raw_ifnfn = mne.io.read_raw_fif(ifnfn_path, preload=True, verbose=False)
-        # # Apply virtual channels (e.g. Weighted Laplacian) before picking
-        # self._apply_virtual_channels(self.raw_fot)
-        # self._apply_virtual_channels(self.raw_ifnfn)
-
-        self._apply_picks(self.raw_fot)
         self._apply_picks(self.raw_ifnfn)
 
     def load_single_file(self, raw_path: Path) -> None:
@@ -290,7 +287,6 @@ class TFRContrastAnalyzer:
         by marker codes 101/201.
         """
         raw = mne.io.read_raw_fif(raw_path, preload=True, verbose=False)
-        self._apply_virtual_channels(raw)
         self._apply_picks(raw)
         # Both conditions share the same Raw — epoching separates them
         self.raw_fot = raw
@@ -641,14 +637,12 @@ class TFRContrastAnalyzer:
           4    contrast      → self.tfr_contrast
         Returns True on success.
         """
-        if self.raw_fot is None:
-            logger.error(
-                "No data loaded. Call load_two_files() or load_single_file() first."
-            )
-            return False
 
         raw_fot_clean = self.preprocess(self.raw_fot, label="FOT")
         raw_ifnfn_clean = self.preprocess(self.raw_ifnfn, label="IFNFN")
+
+        self._apply_virtual_channels(raw_fot_clean)
+        self._apply_virtual_channels(raw_ifnfn_clean)
 
         # Steps 1–3 per condition
         if self.cfg.contrast_mode == "absolute":
@@ -1111,6 +1105,7 @@ class TFRContrastAnalyzer:
         n_fot = str(getattr(self.tfr_fot, "nave", "?")) if self.tfr_fot else "N/A"
         n_ifnfn = str(getattr(self.tfr_ifnfn, "nave", "?")) if self.tfr_ifnfn else "N/A"
         ch_names = self.tfr_fot.ch_names if self.tfr_fot else []
+
 
         # Breakdown into physical and virtual
         virt_names = (
@@ -2023,40 +2018,3 @@ Click a band to expand, then click a channel.</p>
         </div>
         """
         return section_html
-
-    def validate(self) -> Optional[str]:
-        """
-        Validates current state of the Analyzer.
-
-        Returns None on success, or a string describing the first error found.
-        Validates against the configured pick_channels (not a hardcoded set)
-        so it works with any montage (freg8, freg9, kullab, etc.).
-        """
-        if self.tfr_fot is None:
-            return "FOT TFR is None"
-        if self.tfr_ifnfn is None:
-            return "IFNFN TFR is None"
-        if self.tfr_contrast is None:
-            return "Contrast TFR is None"
-
-        # Check shapes match
-        if self.tfr_fot.data.shape != self.tfr_ifnfn.data.shape:
-            return f"Shape mismatch: FOT {self.tfr_fot.data.shape} vs IFNFN {self.tfr_ifnfn.data.shape}"
-        if self.tfr_fot.data.shape != self.tfr_contrast.data.shape:
-            return "Contrast shape doesn't match conditions"
-
-        # Check channels match the configured picks (if specified)
-        if self.cfg.pick_channels:
-            expected_chs = set(self.cfg.pick_channels)
-            actual_chs = set(self.tfr_fot.ch_names)
-            if actual_chs != expected_chs:
-                return f"Channel mismatch: expected {expected_chs}, got {actual_chs}"
-
-        # Check FOT and IFNFN have identical channel sets
-        if set(self.tfr_fot.ch_names) != set(self.tfr_ifnfn.ch_names):
-            return (
-                f"FOT/IFNFN channel mismatch: "
-                f"{self.tfr_fot.ch_names} vs {self.tfr_ifnfn.ch_names}"
-            )
-
-        return None
