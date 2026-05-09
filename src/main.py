@@ -48,6 +48,7 @@ def main():
     analyze_contrast_parser.add_argument("-c", "--config", type=Path, default=None,help="Analysis YAML config (optional)",)
     analyze_contrast_parser.add_argument("-o", "--output", type=Path, default=Path("reports"),help="Output directory for report",)
     analyze_contrast_parser.add_argument("-s", "--stimfreq", type=int, help="StimFreq in Hz")
+    analyze_contrast_parser.add_argument("--export-csv", action="store_true", help="Export TFR data to CSV")
 
     convert = subparsers.add_parser("convert", help="Convert CSV to RAW")
     convert.add_argument("-f", "--file", type=str, required=True, help="CSV file path")
@@ -133,6 +134,12 @@ def main():
         else:
             cfg = TFRContrastConfig()
 
+        if args.export_csv:
+            cfg.export_csv = True
+
+        if args.stimfreq:
+            cfg.stim_freq = float(args.stimfreq)
+
         # Automatically resolve the montage profile if set
         if cfg.montage_profile:
             montage_dir = Path(__file__).resolve().parent.parent / "config" / "montages"
@@ -149,7 +156,6 @@ def main():
         analyzer = TFRContrastAnalyzer(cfg)
         analyzer.load_two_files(args.fot, args.ifnfn)
 
-        logger.info("Running 4-step pipeline...")
         success = analyzer.run_pipeline()
 
         if not success:

@@ -179,6 +179,7 @@ class TFRContrastConfig:
 
     # --- Output ---
     output_dir: str = "reports"
+    export_csv: bool = False
 
     @classmethod
     def from_yaml(cls, yaml_dict: Dict[str, Any]) -> "TFRContrastConfig":
@@ -1099,7 +1100,10 @@ class TFRContrastAnalyzer:
             return s
 
         # --- Export TFR data as CSV ---
-        self._export_csv(csv_dir)
+        if self.cfg.export_csv:
+            self._export_csv(csv_dir)
+        else:
+            logger.info("CSV export disabled.")
 
         # --- Collect data for the report ---
         n_fot = str(getattr(self.tfr_fot, "nave", "?")) if self.tfr_fot else "N/A"
@@ -1132,9 +1136,10 @@ class TFRContrastAnalyzer:
                 summary_section = self._build_summary_html(
                     summary_df, stim_freq=self.cfg.stim_freq
                 )
-                summary_csv_path = csv_dir / "channel_summary.csv"
-                summary_df.to_csv(summary_csv_path, index=False)
-                logger.info("Exported %s", summary_csv_path.name)
+                if self.cfg.export_csv:
+                    summary_csv_path = csv_dir / "channel_summary.csv"
+                    summary_df.to_csv(summary_csv_path, index=False)
+                    logger.info("Exported %s", summary_csv_path.name)
 
         # --- Section 2: Overview TFR plots ---
         overview_plots = ""
