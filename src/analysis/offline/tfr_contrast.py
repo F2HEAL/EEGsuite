@@ -961,14 +961,20 @@ class TFRContrastAnalyzer:
         ax2.legend()
 
         if hasattr(self.cfg, "stim_freq"):
+            sf = self.cfg.stim_freq
+            fmax = self.cfg.tfr_fmax
+            last_sf = int(fmax / sf) + 1
             for ax in [ax1, ax2]:
-                ax.axvline(
-                    self.cfg.stim_freq,
-                    color="orange",
-                    linestyle="--",
-                    alpha=0.5,
-                    label=f"Stim {self.cfg.stim_freq}Hz",
-                )
+                for i in range(1, last_sf):
+                    color = "#F59E0B" if i == 1 else "#CC3300"
+                    label = f"Stim {sf}Hz" if i == 1 else f"Harmonic {i*sf}Hz"
+                    ax.axvline(
+                        i * sf,
+                        color=color,
+                        linestyle="--",
+                        alpha=0.5,
+                        label=label,
+                    )
 
         plt.tight_layout()
         return fig
