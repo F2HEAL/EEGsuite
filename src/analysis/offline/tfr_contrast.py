@@ -586,12 +586,17 @@ class TFRContrastAnalyzer:
             logger.info("TFR computed (absolute power) for '%s'.", event_name)
 
         # --- PSD calculation on stimulation window ---
-        logger.info("Computing PSD on stimulation window...")
+        logger.info("Computing PSD on stimulation window [%d, %d]Hz - [%d,%d]s",
+                    self.cfg.tfr_fmin,
+                    self.cfg.tfr_fmax,
+                    self.cfg.stim_window_tmin,
+                    self.cfg.stim_window_tmax,
+                    )
         # Use Welch or Multitaper. MNE compute_psd uses Welch by default.
         spectrum = epochs.compute_psd(
             method="welch",
-            fmin=20.0,
-            fmax=200.0,
+            fmin=self.cfg.tfr_fmin,
+            fmax=self.cfg.tfr_fmax,
             tmin=self.cfg.stim_window_tmin,
             tmax=self.cfg.stim_window_tmax,
             picks="all",
@@ -651,13 +656,29 @@ class TFRContrastAnalyzer:
             self.tfr_contrast._data = self.tfr_fot.data - self.tfr_ifnfn.data
             logger.info("Contrast TFR computed via Ratio Subtraction (dB/LogRatio).")
 
-        # Step 5: PSD Contrast = FOT - IFNFN
-        if self.psd_fot is not None and self.psd_ifnfn is not None:
-            self.psd_contrast = self.psd_fot.copy()
-            self.psd_contrast._data = self.psd_fot.get_data(
-                picks="all"
-            ) - self.psd_ifnfn.get_data(picks="all")
-            logger.info("Contrast PSD computed (FOT - IFNFN).")
+        # Step 5: PSD Contrast from tfr_contrast
+        if self.tfr_contrast is not None:
+            time_mask = (self.tfr_contrast.times >= self.cfg.stim_window_tmin) & (
+                self.tfr_contrast.times <= self.cfg.stim_window_tmax
+            )
+            psd_data = self.tfr_contrast.data[:, :, time_mask].mean(axis=-1)
+            
+            class SimpleSpectrum:
+                def __init__(self, freqs, ch_names, data):
+                    self.freqs = freqs
+                    self.ch_names = ch_names
+                    self._data = data
+
+                def get_data(self, picks=None):
+                    if picks == "all" or picks is None:
+                        return self._data
+                    idx = [self.ch_names.index(p) for p in picks]
+                    return self._data[idx]
+
+            self.psd_contrast = SimpleSpectrum(
+                self.tfr_contrast.freqs, self.tfr_contrast.ch_names, psd_data
+            )
+            logger.info("Contrast PSD computed from tfr_contrast.")
 
         return True
 
@@ -926,7 +947,7 @@ class TFRContrastAnalyzer:
 
         # Bottom plot: Contrast (Linear scale to show subtraction clearly)
         ax2.plot(
-            freqs,
+            self.psd_contrast.freqs,
             psd_cont_lin,
             label="Contrast (FOT - IFNFN)",
             color="green",
