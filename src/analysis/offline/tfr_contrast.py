@@ -956,7 +956,7 @@ class TFRContrastAnalyzer:
         ax2.axhline(0, color="black", linestyle="-", alpha=0.3)
         ax2.set_title("Contrast Spectrum (Neural Response)")
         ax2.set_xlabel("Frequency (Hz)")
-        ax2.set_ylabel("Power Difference (μV^2/Hz)")
+        ax2.set_ylabel("Power Difference (μV²/Hz)")
         ax2.grid(True, alpha=0.3)
         ax2.legend()
 
@@ -1146,29 +1146,29 @@ class TFRContrastAnalyzer:
         if self.tfr_fot is not None:
             fig = self.plot_tfr(self.tfr_fot, title="FOT (Tactile + EM Noise)")
             overview_plots += (
-                '<div class="subsection">'
-                "<h3>FOT Condition (Finger On Tactor)</h3>"
+                '<details class="subsection">'
+                "<summary><strong>FOT Condition (Finger On Tactor)</strong></summary>"
                 '<p class="caption">Contains both the neural response and EM artifact from the vibration motor.</p>'
                 + _fig_block(fig, "TFR_FOT")
-                + "</div>"
+                + "</details>"
             )
         if self.tfr_ifnfn is not None:
             fig = self.plot_tfr(self.tfr_ifnfn, title="IFNFN (EM Noise Only)")
             overview_plots += (
-                '<div class="subsection">'
-                "<h3>IFNFN Condition (In-Field Not-Feeling Nipple)</h3>"
+                '<details class="subsection">'
+                "<summary><strong>IFNFN Condition (In-Field Not-Feeling Nipple)</strong></summary>"
                 '<p class="caption">Control: same EM noise, no tactile contact. Serves as the artifact template.</p>'
                 + _fig_block(fig, "TFR_IFNFN")
-                + "</div>"
+                + "</details>"
             )
         if self.tfr_contrast is not None:
             fig = self.plot_contrast()
             overview_plots += (
-                '<div class="subsection">'
-                "<h3>Contrast (FOT &minus; IFNFN)</h3>"
+                '<details class="subsection">'
+                "<summary><strong>Contrast (FOT &minus; IFNFN)</strong></summary>"
                 '<p class="caption">Isolated neural response after EM artifact subtraction.</p>'
                 + _fig_block(fig, "TFR_Contrast")
-                + "</div>"
+                + "</details>"
             )
 
         # --- Section 3: Per-channel comparisons (collapsible) ---
@@ -1419,7 +1419,7 @@ table th, table td {{ padding: 8px 10px; }}
 <div class="section" id="overview">
 <h2><span class="sec-num">3.</span> TFR Overview</h2>
 <p>Full time&ndash;frequency representations for each condition and their contrast.
-Each subplot shows one channel; time is relative to stimulation onset (t&nbsp;=&nbsp;0).</p>
+Each subplot shows one channel; time is relative to stimulation onset (t&nbsp;=&nbsp;0). Click to expand.</p>
 {overview_plots}
 </div>
 
