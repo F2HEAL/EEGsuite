@@ -40,39 +40,12 @@ import numpy as np
 import pandas as pd
 from pyprep.prep_pipeline import PrepPipeline
 
+from src.utils.logger import setup_logger
+
 matplotlib.use("Agg")
-
-# Improvement 2: Silence external libraries
-mne.set_log_level("WARNING")
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
-pyprep_logger = logging.getLogger("pyprep")
-pyprep_logger.setLevel(logging.WARNING)
-
-
-# Filter out specific annoying pyprep messages that are redundant or misleading
-class PyPrepFilter(logging.Filter):
-    def filter(self, record):
-        msg = record.getMessage()
-        if "Overwriting `ransac` value" in msg:
-            return False
-        return True
-
-
-pyprep_logger.addFilter(PyPrepFilter())
-
-# Also silence specific RuntimeWarnings from MNE/PyPREP regarding digitization points
-warnings.filterwarnings("ignore", message=".*head digitization points.*")
 
 # Improvement 1: Enhanced logging format for this script
 logger = logging.getLogger(__name__)
-if not logger.handlers:
-    _ch = logging.StreamHandler()
-    _formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S"
-    )
-    _ch.setFormatter(_formatter)
-    logger.addHandler(_ch)
-    logger.propagate = False  # Prevent double-logging to console via root logger
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -2023,3 +1996,46 @@ Click a band to expand, then click a channel.</p>
         </div>
         """
         return section_html
+
+
+def main():
+    import argparse
+
+    setup_logger()  # Initialize logging for standalone use
+
+    parser = argparse.ArgumentParser(description="TFR Contrast Analysis")
+    parser.add_argument("--fot", type=Path, required=True, help="FOT condition file")
+    parser.add_argument("--ifnfn", type=Path, required=True, help="IFNFN condition file")
+    parser.add_argument("-c", "--config", type=Path, help="Config YAML file")
+    parser.add_argument("-o", "--output", type=Path, default=Path("reports"))
+    parser.add_argument("-s", "--stimfreq", type=float, help="Stimulation frequency")
+    parser.add_argument("--export-csv", action="store_true", help="Export CSV data")
+
+    args = parser.parse_args()
+
+    # Load config
+    if args.config:
+        from src.utils.config import load_yaml
+
+        cfg = TFRContrastConfig.from_yaml(load_yaml(args.config))
+    else:
+        cfg = TFRContrastConfig()
+
+    if args.export_csv:
+        cfg.export_csv = True
+    if args.stimfreq:
+        cfg.stim_freq = args.stimfreq
+
+    cfg.output_dir = str(args.output)
+
+    analyzer = TFRContrastAnalyzer(cfg)
+    analyzer.load_two_files(args.fot, args.ifnfn)
+    if analyzer.run_pipeline():
+        report_path = analyzer.generate_report()
+        logger.info("Analysis complete. Report: %s", report_path)
+    else:
+        logger.error("Analysis failed.")
+
+
+if __name__ == "__main__":
+    main()
