@@ -28,6 +28,7 @@ Usage (from main.py):
 import gc
 import html
 import logging
+import time
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -1078,6 +1079,9 @@ class TFRContrastAnalyzer:
         csv_dir = out / "csv"
         csv_dir.mkdir(parents=True, exist_ok=True)
 
+        t_report_start = time.perf_counter()
+        logger.info("Generating analysis report in: %s", out.resolve())
+
         plot_counter = 0
 
         def _save_fig(fig, name: str, dpi_html: int = 120, dpi_png: int = 200):
@@ -1110,6 +1114,8 @@ class TFRContrastAnalyzer:
         n_ifnfn = str(getattr(self.tfr_ifnfn, "nave", "?")) if self.tfr_ifnfn else "N/A"
         ch_names = self.tfr_fot.ch_names if self.tfr_fot else []
 
+        logger.info("Reporting on %d channels (Trials: FOT=%s, IFNFN=%s)",
+                    len(ch_names), n_fot, n_ifnfn)
 
         # Breakdown into physical and virtual
         virt_names = (
@@ -1140,8 +1146,12 @@ class TFRContrastAnalyzer:
                     summary_csv_path = csv_dir / "channel_summary.csv"
                     summary_df.to_csv(summary_csv_path, index=False)
                     logger.info("Exported %s", summary_csv_path.name)
+        
+        logger.info("Data summary and CSV export complete (%.2fs)", 
+                    time.perf_counter() - t_report_start)
 
         # --- Section 2: Overview TFR plots ---
+        logger.info("Generating Overview TFR plots...")
         overview_plots = ""
         if self.tfr_fot is not None:
             fig = self.plot_tfr(self.tfr_fot, title="FOT (Tactile + EM Noise)")
@@ -1172,6 +1182,7 @@ class TFRContrastAnalyzer:
             )
 
         # --- Section 3: Per-channel comparisons (collapsible) ---
+        logger.info("Generating %d per-channel comparison plots...", len(ch_names))
         comparison_plots = ""
         if self.tfr_contrast is not None:
             for ch in ch_names:
@@ -1190,6 +1201,7 @@ class TFRContrastAnalyzer:
                 gc.collect()
 
         # --- Section 4: PSD Comparison (collapsible) ---
+        logger.info("Generating %d per-channel PSD comparison plots...", len(ch_names))
         psd_plots = ""
         if self.psd_fot is not None and self.psd_ifnfn is not None:
             for ch in ch_names:
@@ -1207,6 +1219,7 @@ class TFRContrastAnalyzer:
                 gc.collect()
 
         # --- Section 5: Band time-courses (collapsible, grouped by band) ---
+        logger.info("Generating band time-course plots...")
         band_plots = ""
         if self.tfr_contrast is not None:
             stim_low = self.cfg.stim_freq - 5.0
@@ -1471,10 +1484,11 @@ Click a band to expand, then click a channel.</p>
         report_path = out / filename
         report_path.write_text(html_content, encoding="utf-8")
         logger.info(
-            "Report saved: %s (%d plots in png/, %d CSVs in csv/)",
+            "Report saved: %s (%d plots in png/, %d CSVs in csv/) - took %.2fs",
             report_path,
             plot_counter,
             len(list(csv_dir.glob("*.csv"))),
+            time.perf_counter() - t_report_start,
         )
         return report_path
 

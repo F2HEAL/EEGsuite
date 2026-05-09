@@ -163,7 +163,6 @@ def main():
             sys.exit(1)
 
         report_path = analyzer.generate_report(output_dir=output_dir)
-        print(f"Report: {report_path}")
 
     elif args.command == "convert":
         from src.converting.convert import read_yaml_config, mne_from_brainflow, write_raw
