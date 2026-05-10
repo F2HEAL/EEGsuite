@@ -69,15 +69,15 @@ Each sweep file contains multiple cycles (trials) of:
 
 ## 🏷 Marker Reference Table
 
-| Marker | Description | Phase |
-| :--- | :--- | :--- |
-| **3** | Baseline 1: VHP OFF/ON transition | Calibration |
-| **31** | Baseline 2: Stim ON (No physical contact) | Calibration |
-| **33** | Baseline 2: Stim OFF (No physical contact) | Calibration |
-| **333** | Baseline 3: Pre-Sweep Rest (Physical contact) | Recording |
-| **0** | Trial Rest (Inter-stimulus interval) | Recording |
-| **1** | Trial Stimulation ON | Recording |
-| **11** | Trial Stimulation OFF (Recovery) | Recording |
+| Marker  | Description                                   | Phase       |
+|:--------|:----------------------------------------------|:------------|
+| **3**   | Baseline 1: VHP OFF/ON transition             | Calibration |
+| **31**  | Baseline 2: Stim ON (No physical contact)     | Calibration |
+| **33**  | Baseline 2: Stim OFF (No physical contact)    | Calibration |
+| **333** | Baseline 3: Pre-Sweep Rest (Physical contact) | Recording   |
+| **0**   | Trial Rest (Inter-stimulus interval)          | Recording   |
+| **1**   | Trial Stimulation ON                          | Recording   |
+| **11**  | Trial Stimulation OFF (Recovery)              | Recording   |
 
 ---
 

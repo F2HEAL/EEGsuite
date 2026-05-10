@@ -241,6 +241,7 @@ class TFRContrastAnalyzer:
         self.psd_fot = None  # Spectrum after averaging
         self.psd_ifnfn = None
         self.psd_contrast = None  # Spectrum contrast (FOT - IFNFN)
+        self.prep_info: Dict[str, Any] = {}
 
     # ------------------------------------------------------------------
     # Data loading
@@ -431,6 +432,14 @@ class TFRContrastAnalyzer:
 
         # 4. Final summary
         interp_chs = getattr(prep, "interpolated_channels", [])
+        
+        # Store for report
+        self.prep_info[label] = {
+            "interpolated": interp_chs,
+            "bad_before": all_bad,
+            "reference": ref_chs
+        }
+
         if interp_chs:
             logger.info(
                 "  - Interpolated channels (%d): %s", len(interp_chs), interp_chs
@@ -1114,6 +1123,17 @@ class TFRContrastAnalyzer:
         n_ifnfn = str(getattr(self.tfr_ifnfn, "nave", "?")) if self.tfr_ifnfn else "N/A"
         ch_names = self.tfr_fot.ch_names if self.tfr_fot else []
 
+        # PREP results summary for the table
+        def _fmt_prep(label):
+            info = self.prep_info.get(label, {})
+            interp = info.get("interpolated", [])
+            if not interp:
+                return "None"
+            return f"interpolated {len(interp)} channels: {', '.join(interp)}"
+
+        prep_fot_str = _fmt_prep("FOT")
+        prep_ifnfn_str = _fmt_prep("IFNFN")
+
         logger.info("Reporting on %d channels (Trials: FOT=%s, IFNFN=%s)",
                     len(ch_names), n_fot, n_ifnfn)
 
@@ -1404,18 +1424,21 @@ table th, table td {{ padding: 8px 10px; }}
 <div class="section" id="methods">
 <h2><span class="sec-num">2.</span> Methods &amp; Parameters</h2>
 <div class="info-box method">
-    <strong>Pipeline:</strong> Morlet wavelet TFR computed per epoch, then
-    baseline-normalized and averaged across trials. The contrast
+    <strong>Pipeline:</strong> Robust preprocessing via <strong>PyPREP</strong> 
+    (re-referencing and bad channel interpolation). Morlet wavelet TFR computed 
+    per epoch, then baseline-normalized and averaged across trials. The contrast
     (FOT&nbsp;&minus;&nbsp;IFNFN) subtracts the EM artifact common to both
     conditions, isolating the neural component.
 </div>
 <table class="params-table">
     <tr><td>Montage</td><td>{html.escape(self.cfg.montage_profile)} &mdash;
         {montage_text}: {', '.join(ch_names)}</td></tr>
+    <tr><td>PREP (FOT)</td><td>{prep_fot_str}</td></tr>
+    <tr><td>PREP (IFNFN)</td><td>{prep_ifnfn_str}</td></tr>
     <tr><td>TFR method</td><td>Morlet wavelets, {self.cfg.tfr_fmin}&ndash;{self.cfg.tfr_fmax} Hz
         (step {self.cfg.tfr_fstep} Hz), cycles: {self.cfg.n_cycles_mode}</td></tr>
     <tr><td>Contrast Mode</td><td><strong>{self.cfg.contrast_mode.upper()}</strong> 
-        ({ "Subtracting baseline-normalized ratios" if self.cfg.contrast_mode == "ratio" else "Subtracting raw power (\u03BCV\u00B2)" })</td></tr>
+        ({ "Subtracting baseline-normalized ratios" if self.cfg.contrast_mode == "ratio" else "Subtracting raw power (μV²)" })</td></tr>
     <tr><td>Baseline normalization</td><td>{self.cfg.baseline_mode},
         window [{self.cfg.baseline_tmin}, {self.cfg.baseline_tmax}]&nbsp;s</td></tr>
     <tr><td>Stimulation window</td><td>[{self.cfg.stim_window_tmin}, {self.cfg.stim_window_tmax}]&nbsp;s

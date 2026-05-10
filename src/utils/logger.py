@@ -53,7 +53,7 @@ def setup_logger(name: str = None, level: int = logging.INFO) -> logging.Logger:
     import mne
     mne.set_log_level("WARNING")
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
-    
+
     pyprep_logger = logging.getLogger("pyprep")
     pyprep_logger.setLevel(logging.WARNING)
     if not any(isinstance(f, PyPrepFilter) for f in pyprep_logger.filters):

@@ -20,9 +20,10 @@ class LSLServer:
         self.config = config
         self.board_shim: Optional[BoardShim] = None
         self.outlet: Optional[StreamOutlet] = None
-        # Enable BrainFlow logging for better debugging
-        BoardShim.enable_board_logger()
-        BoardShim.set_log_level(LogLevels.LEVEL_INFO)
+        # BrainFlow logging is handled in src.utils.logger.setup_logger()
+        # to ensure consistent formatting.
+        # BoardShim.enable_board_logger()
+        # BoardShim.set_log_level(LogLevels.LEVEL_INFO)
 
     def setup_board(self) -> None:
         """Configures the BrainFlow board based on provided settings."""
