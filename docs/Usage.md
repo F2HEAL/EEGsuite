@@ -2,11 +2,9 @@
 
 This manual explains the usage of the unified command-line interface (CLI) for the EEGsuite software.
 
-The main entry point for the software is `src/main.py`, which offers several subcommands.
+## Workflow
 
-## General Usage
-
-    $ python -m src.main [command] [options]
+![Data Flow Structure](assets/EEGSuite%20overview.png)
 
 A typical workflow would look as follows:
 1. **LSLserver**: Start LSL server to stream the EEG data
@@ -14,9 +12,13 @@ A typical workflow would look as follows:
 3. **convert**: Convert the CSV files to MNE FIF Raw objects
 4. **analyze**: Analyze previously recorded data
 
-![Data Flow Structure](assets/EEGSuite%20overview.png)
-
 When running **LSLserver** and **sweep** on different physical machines, you might need to [reconfigure your local firewall](lslw11firewall.md).
+
+The main entry point for the software is `src/main.py`, which offers several subcommands.
+
+## General Usage
+
+    $ python -m src.main [command] [options]
 
 ## Available Commands
 
