@@ -50,8 +50,6 @@ For more details see [Sweep](Sweep.md)
 * `-p, --protocol`: Path to the protocol configuration file.  (**Required**)
 * `-d, --device`: Path to the hardware configuration file. (**Required**)
 
----
-
 ### 3. `analyze`
 Analyzes a single recorded MNE RAW EEG file and generates an offline visual analysis report in the report directory
 
@@ -64,8 +62,6 @@ Analyzes a single recorded MNE RAW EEG file and generates an offline visual anal
 * `-s, --start`: Start time for analysis in seconds. (Optional; default: `0.0`).
 * `-d, --duration`: Duration of the data to analyze in seconds. (Optional; default: `60.0`).
 * `-v, --verbose`: Enables verbose output. (Optional)
-
----
 
 ### 4. `analyze_contrast`
 Runs a Time-Frequency Representation (TFR) Contrast Analysis pipeline. It compares recorded data between two conditions: FOT (Finger-On-Tactor) and IFNFN (In-Field-Not-Feeling-Nipple).
