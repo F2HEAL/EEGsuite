@@ -12,13 +12,26 @@ This directory contains the firmware source code for the **VHP (Vibrotactile Hap
     *   Extended parameter string support for BLE/Serial communication.
     *   Optimized timing for high-precision academic research.
 
-### 2. [VHP-Vibro-Glove2-current-feedback](VHP-Vibro-Glove2-current-feedback/) (Experimental)
+### 2. [VHPVibroGlove2_1](VHPVibroGlove2_1/) (New)
+*   **Version**: `SERCOM_2_0_2_BETA`
+*   **Description**: A new firmware variant based on the current VHP Vibro Glove 2 code, with integrated flash persistence for settings.
+*   **Key Features**:
+    *   Uses the same stimulation engine and BLE/serial control flow as the main firmware.
+    *   Includes flash-backed settings support via `flash_settings.cpp` / `flash_settings.h`.
+    *   Supports loading and saving runtime settings from the external flash filesystem.
+*   **Usage**:
+    *   `R` loads settings from flash at runtime.
+    *   `W` writes the current in-memory settings to flash.
+    *   `webui25 | WebUI v 2_5`
+    *   If no settings file is present, the firmware starts with the built-in defaults.
+
+### 3. [VHP-Vibro-Glove2-current-feedback](VHP-Vibro-Glove2-current-feedback/) (Experimental)
 *   **Version**: `1.0.0-currenttest`
 *   **Description**: Experimental branch for load condition monitoring.
 *   **Objective**: Implements **Current Measurement** of VCA (Voice Coil Actuator) consumption.
 *   **Implementation**: Uses `Max14661` mux and `DLog1` for high-speed current logging to provide feedback on the physical load/skin-contact status.
 
-### 3. [VHP-Vibro-Glove2-Current-Sense-v1](VHP-Vibro-Glove2-Current-Sense-v1/) (New)
+### 4. [VHP-Vibro-Glove2-Current-Sense-v1](VHP-Vibro-Glove2-Current-Sense-v1/) (New)
 *   **Version**: `SERCOM_2_0_3_CURRENT_SENSE_v1`
 *   **Description**: The integrated solution merging stable core features with advanced sensing.
 *   **Key Features**:

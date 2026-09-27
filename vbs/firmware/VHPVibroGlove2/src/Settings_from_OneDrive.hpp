@@ -21,7 +21,7 @@ struct Settings {
     const uint32_t default_channels = 8;  /* Number of channels silence is played
                                              on when stream is not playing */
   
-    const bool     start_stream_on_power_on = false; /* Start Stream on Power On */
+    const bool     start_stream_on_power_on = true; /* Start Stream on Power On */
 
     /*
      * The default values for starting the Stream, see Stream.hpp for explanation.
@@ -30,19 +30,19 @@ struct Settings {
      */
     bool chan8 = true;
     uint32_t samplerate = 46875; //46875 | 30000
-    uint32_t stimfreq = 40;
-    uint32_t stimduration = 8000;
-    uint32_t cycleperiod = 64000;
-    uint32_t pauzecycleperiod = 1;
-    uint32_t pauzedcycles = 0;
-    uint16_t jitter = 0;
+    uint32_t stimfreq = 250;
+    uint32_t stimduration = 100;
+    uint32_t cycleperiod = 1332;
+    uint32_t pauzecycleperiod = 5;
+    uint32_t pauzedcycles = 2;
+    uint16_t jitter = 235;
 
     // Volume settings
-    uint8_t volume = 100;  // Default volume (0-100)
+    uint8_t volume = 33;  // Default volume (0-100)
     uint32_t vol_amplitude = 208;  // Maximum amplitude scaling
 
-    bool test_mode = true;
-    uint16_t single_channel = 1;
+    bool test_mode = false;
+    uint16_t single_channel = 0;
 
     /**
      * Gets the default parameter string as const char*

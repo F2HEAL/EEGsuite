@@ -12,6 +12,9 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 
 RANDOM_SEED: int = 42
+UV_TO_V: float = 1e-6
+DEFAULT_SFREQ: float = 512.0
+ANNOTATION_DURATION: float = 0.01
 
 logger = logging.getLogger(__name__)
 
@@ -140,13 +143,26 @@ class EEGVisualizer:
             logger.warning("Montage profile '%s' not found at %s", profile, profile_path)
 
     def load_data(self, raw_file: Path):
-        """Loads CSV data and creates MNE object."""
-
-        self.raw = mne.io.read_raw_fif(raw_file, preload=True) 
+        """
+        Loads EEG data and creates MNE object.
         
+        Supports .fif and .csv files.
+
+        Args:
+            raw_file: Path to the data file.
+        """
+        if raw_file.suffix.lower() == '.csv':
+            self._load_csv(raw_file)
+        else:
+            logger.info("Opening raw data file %s...", raw_file)
+            self.raw = mne.io.read_raw_fif(raw_file, preload=True)
+            self.sfreq = self.raw.info['sfreq']
         
         # Apply virtual channels (e.g. Laplacian) before picking
         self._apply_virtual_channels()
+
+        # Apply global filters (bandpass, notch)
+        self._apply_filters()
 
         # Apply global channel picking
         picks = self.config.get('pick_channels')
@@ -155,6 +171,63 @@ class EEGVisualizer:
             if valid_picks:
                 self.raw.pick_channels(valid_picks)
                 logger.info("Global channel pick applied: %s", valid_picks)
+
+    def _load_csv(self, csv_file: Path):
+        """
+        Reads Brainflow CSV and creates MNE Raw object.
+        
+        Args:
+            csv_file: Path to the CSV file.
+        """
+        logger.info("Reading Brainflow CSV from %s", csv_file)
+        
+        # Load data
+        try:
+            # Brainflow CSVs usually have no header
+            data_in = pd.read_csv(csv_file, header=None).values.T
+        except Exception as e:
+            logger.error("Failed to read CSV file %s: %s", csv_file, e)
+            raise
+
+        # Brainflow format: [timestamp, ch1, ch2, ..., chN, marker, ...]
+        # Channel names from config
+        channels = self.config.get('channels', [])
+        if not channels:
+            logger.warning("No channels defined in config. Using default channel count (8).")
+            channels = [f"CH{i}" for i in range(1, 9)]
+
+        num_channels = len(channels)
+        
+        # timestamps are in the first column
+        timestamps = data_in[0]
+        
+        # EEG data (convert from uV to V for MNE)
+        # Brainflow/FreeEEG32 usually returns microvolts
+        data = data_in[1 : num_channels + 1] * UV_TO_V
+        
+        # markers are usually after EEG channels
+        markers = data_in[num_channels + 1]
+        
+        self.sfreq = float(self.config.get('sfreq', DEFAULT_SFREQ))
+        
+        info = mne.create_info(
+            ch_names=channels,
+            sfreq=self.sfreq,
+            ch_types=['eeg'] * num_channels
+        )
+        
+        self.raw = mne.io.RawArray(data, info)
+        
+        # Set montage if specified
+        montage_name = self.config.get('montage')
+        if montage_name:
+            try:
+                self.raw.set_montage(montage_name, on_missing='ignore')
+            except Exception as e:
+                logger.warning("Failed to set montage %s: %s", montage_name, e)
+        
+        # Add annotations
+        self._add_annotations(timestamps, markers)
 
     def _apply_virtual_channels(self):
         """Computes and adds virtual channels (e.g., Weighted Laplacian) from config."""
@@ -195,16 +268,42 @@ class EEGVisualizer:
             except Exception as e:
                 logger.error("Failed to create virtual channel %s: %s", name, e)
 
-    def _add_annotations(self, timestamps, markers):
-        valid_mask = ~np.isnan(markers)
-        if not np.any(valid_mask):
+    def _apply_filters(self):
+        """Applies bandpass and notch filters based on config."""
+        if not self.raw:
             return
-            
-        marker_indices = np.where(valid_mask)[0]
-        marker_values = markers[valid_mask]
-        onsets = timestamps[marker_indices] - timestamps[0]
-        
+
+        fmin = self.config.get('fmin')
+        fmax = self.config.get('fmax')
+        notch_freqs = self.config.get('notch_freqs')
+
+        if fmin is not None or fmax is not None:
+            logger.info("Applying bandpass filter: %s - %s Hz", fmin, fmax)
+            self.raw.filter(l_freq=fmin, h_freq=fmax, fir_design='firwin', verbose=False)
+
+        if notch_freqs:
+            # Handle both single value and list
+            freqs = notch_freqs if isinstance(notch_freqs, list) else [notch_freqs]
+            logger.info("Applying notch filter: %s Hz", freqs)
+            self.raw.notch_filter(freqs=freqs, fir_design='firwin', verbose=False)
+
+    def _add_annotations(self, timestamps: np.ndarray, markers: np.ndarray):
+        """
+        Parses markers and adds them as annotations to the raw object.
+
+        Args:
+            timestamps: Array of timestamps.
+            markers: Array of marker values.
+        """
         marker_map = {
+            # New condition-aware markers
+            100.0: "FOT_Rest [100]",
+            101.0: "FOT_Stim_ON [101]",
+            111.0: "FOT_Stim_OFF [111]",
+            200.0: "IFNFN_Rest [200]",
+            201.0: "IFNFN_Stim_ON [201]",
+            211.0: "IFNFN_Stim_OFF [211]",
+            # Legacy markers
             0.0: 'Stimulation READY [0]',
             1.0: 'Stimulation ON [1]',
             11.0: 'Stimulation OFF [11]',
@@ -213,10 +312,31 @@ class EEGVisualizer:
             31.0: 'Baseline_NoContact [31]',
             333.0: 'Baseline_PreSweep [333]'
         }
+
+        # Find where markers are present
+        # In Brainflow CSV, non-marker samples are usually NaN or 0.0
+        valid_mask = ~np.isnan(markers)
+        
+        # If the file is full of 0.0, we only want the transitions.
+        # But usually, they are NaNs. To be safe, if it's 0.0 everywhere, we filter it.
+        if np.all(markers == 0.0):
+             return
+
+        if not np.any(valid_mask):
+            return
+            
+        marker_indices = np.where(valid_mask)[0]
+        marker_values = markers[marker_indices]
+        onsets = timestamps[marker_indices] - timestamps[0]
         
         descriptions = [marker_map.get(m, f"Event_{int(m)}") for m in marker_values]
-        annots = mne.Annotations(onset=onsets, duration=[0.01]*len(onsets), description=descriptions)
+        annots = mne.Annotations(
+            onset=onsets, 
+            duration=[ANNOTATION_DURATION] * len(onsets), 
+            description=descriptions
+        )
         self.raw.set_annotations(annots)
+        logger.info("Found %d annotations", len(annots))
 
     def create_timeseries_plot(self, start: float, duration: float):
         """Creates a timeseries plot with markers."""
@@ -252,7 +372,7 @@ class EEGVisualizer:
 
     def create_psd_plot(self):
         """Create PSD plot"""
-        fmin, fmax = self.config.get('psd_fmin', 1.0), self.config.get('psd_fmax', 60.0)
+        fmin, fmax = self.config.get('psd_fmin', 5.0), self.config.get('psd_fmax', 200.0)
         try:
             psd = self.raw.compute_psd(fmin=fmin, fmax=fmax, method='welch')
             fig = psd.plot(average=True, show=False)
@@ -354,9 +474,18 @@ class EEGVisualizer:
             logger.error("Error creating ERP Image plot: %s", e)
             return None
 
-    def create_epoch_psd_plot(self, event_type: str = 'Stimulation ON [1]'):
-        """Create PSD plot averaged across all epochs of a specific event type."""
-        if not self.raw.annotations:
+    def create_epoch_psd_plot(self, event_type: str = 'Stimulation ON [1]', 
+                              average_channels: bool = True, 
+                              color_map: Optional[Dict[str, str]] = None):
+        """
+        Create PSD plot averaged across all epochs of a specific event type.
+        
+        Args:
+            event_type: The marker description to epoch around.
+            average_channels: If True, averages across all channels. If False, shows individual channels.
+            color_map: Optional mapping for channel colors (used when average_channels=False).
+        """
+        if not self.raw or not self.raw.annotations:
             return None
         
         events, event_id = mne.events_from_annotations(self.raw)
@@ -364,6 +493,9 @@ class EEGVisualizer:
             return None
             
         tmax = self.config.get('erp_duration', 1.0)
+        fmin = self.config.get('psd_fmin', 5.0)
+        fmax = self.config.get('psd_fmax', 100.0)
+        
         try:
             epochs = mne.Epochs(self.raw, events, event_id=event_id[event_type],
                                tmin=0, tmax=tmax, baseline=None,
@@ -372,15 +504,44 @@ class EEGVisualizer:
                 return None
                 
             # Compute PSD for the epochs
-            psd = epochs.compute_psd(fmin=1.0, fmax=60.0, method='welch')
-            fig = psd.plot(average=True, show=False)
-            fig.axes[0].set_title(f'Epoch PSD: {event_type} (n={len(epochs)})')
+            psd = epochs.compute_psd(fmin=fmin, fmax=fmax, method='welch')
+            
+            if average_channels:
+                fig = psd.plot(average=True, show=False)
+                fig.axes[0].set_title(f'Epoch PSD (Grand Average): {event_type} (n={len(epochs)})')
+            else:
+                # Custom plot for individual channels with color_map
+                fig, ax = plt.subplots(figsize=(10, 6))
+                # Average across epochs gives (n_channels, n_freqs)
+                data = psd.get_data().mean(axis=0) 
+                freqs = psd.freqs
+                
+                default_colors = plt.cm.tab10(np.linspace(0, 1, len(self.raw.ch_names)))
+                
+                for i, ch_name in enumerate(self.raw.ch_names):
+                    # Convert to dB
+                    psd_db = 10 * np.log10(data[i])
+                    
+                    color = default_colors[i]
+                    if color_map:
+                        for target, c in color_map.items():
+                            if target in ch_name:
+                                color = c
+                                break
+                    ax.plot(freqs, psd_db, label=ch_name, color=color, lw=1.5)
+                
+                ax.set_title(f'Epoch PSD (Per Channel): {event_type} (n={len(epochs)})')
+                ax.set_xlabel('Frequency (Hz)')
+                ax.set_ylabel('Power (dB)')
+                ax.legend(loc='upper right', fontsize='small', ncol=2 if len(self.raw.ch_names) > 5 else 1)
+                ax.grid(True, alpha=0.3)
+                
             return fig
         except Exception as e:
             logger.error("Error creating Epoch PSD plot for %s: %s", event_type, e)
             return None
 
-    def create_spectrogram_plot(self, channel_name: str, fmin: float = 20.0, fmax: float = 60.0):
+    def create_spectrogram_plot(self, channel_name: str, fmin: float = 20.0, fmax: float = 200.0):
         """Create a Morlet wavelet spectrogram for a specific channel."""
         logger.info("Generating spectrogram for %s...", channel_name)
         try:
@@ -442,8 +603,16 @@ class EEGVisualizer:
         
         return quality_info
 
-    def create_frequency_band_plot(self, band_name: str, fmin: float, fmax: float):
-        """Create plot for specific frequency band with colors and legend."""
+    def create_frequency_band_plot(self, band_name: str, fmin: float, fmax: float, color_map: Optional[Dict[str, str]] = None):
+        """
+        Create plot for specific frequency band with colors and legend.
+        
+        Args:
+            band_name: Name of the frequency band.
+            fmin: Start frequency.
+            fmax: End frequency.
+            color_map: Optional mapping of channel name substrings to colors.
+        """
         try:
             psd = self.raw.compute_psd(fmin=fmin, fmax=fmax, method='welch')
             
@@ -454,13 +623,22 @@ class EEGVisualizer:
             data = psd.get_data() # shape (n_channels, n_freqs)
             freqs = psd.freqs
             
-            # Plot each channel with a unique color from a standard map
-            colors = plt.cm.tab10(np.linspace(0, 1, len(self.raw.ch_names)))
+            # Default color cycle
+            default_colors = plt.cm.tab10(np.linspace(0, 1, len(self.raw.ch_names)))
             
             for i, ch_name in enumerate(self.raw.ch_names):
                 # Convert to dB for consistent scaling
                 psd_db = 10 * np.log10(data[i])
-                ax.plot(freqs, psd_db, label=ch_name, color=colors[i], lw=1.5)
+                
+                # Determine color: check color_map first, then default cycle
+                color = default_colors[i]
+                if color_map:
+                    for target, c in color_map.items():
+                        if target in ch_name:
+                            color = c
+                            break
+                
+                ax.plot(freqs, psd_db, label=ch_name, color=color, lw=1.5)
             
             ax.set_title(f'{band_name} ({fmin}-{fmax} Hz) Power Spectrum')
             ax.set_xlabel('Frequency (Hz)')
@@ -495,8 +673,8 @@ class EEGVisualizer:
             raw_stim = self.raw.copy().crop(tmin=stim_onset, tmax=min(stim_onset + duration, self.raw.times[-1]))
             raw_base = self.raw.copy().crop(tmin=base_onset, tmax=min(base_onset + duration, self.raw.times[-1]))
             
-            psd_stim = raw_stim.compute_psd(fmin=1, fmax=55, method='welch')
-            psd_base = raw_base.compute_psd(fmin=1, fmax=55, method='welch')
+            psd_stim = raw_stim.compute_psd(fmin=5, fmax=200, method='welch')
+            psd_base = raw_base.compute_psd(fmin=5, fmax=200, method='welch')
             
             fig, ax = plt.subplots(figsize=(10, 6))
             freqs = psd_stim.freqs
@@ -520,6 +698,12 @@ class EEGVisualizer:
         """Generates the full HTML report."""
         report = SimpleReport(output_dir, title=f"EEG Analysis: {csv_file.name}")
         
+        # Define specific colors for S1 channels used across various plots
+        color_map = {
+            'S1_left': '#e74c3c',  # Red
+            'S1_right': '#3498db'  # Blue
+        }
+
         # 1. Info section
         info = {
             "File": str(csv_file),
@@ -570,10 +754,15 @@ class EEGVisualizer:
                               plot_caption="ERP Image: Shows the amplitude of each individual trial as a heatmap, allowing you to see the consistency of the response across the entire recording.")
 
         # 8. Epoch PSD section (Frequency domain of the stimulation segments)
-        fig_epsd = self.create_epoch_psd_plot('Stimulation ON [1]')
+        fig_epsd = self.create_epoch_psd_plot('Stimulation ON [1]', average_channels=True)
         if fig_epsd:
-            report.add_section("Epoch-Averaged PSD", plot=fig_epsd,
-                              plot_caption="Power Spectrum specifically for the Stimulation ON epochs (n=x)")
+            report.add_section("Epoch-Averaged PSD (Grand Average)", plot=fig_epsd,
+                              plot_caption="Power Spectrum averaged across ALL channels and ALL Stimulation ON epochs.")
+
+        fig_epsd_ch = self.create_epoch_psd_plot('Stimulation ON [1]', average_channels=False, color_map=color_map)
+        if fig_epsd_ch:
+            report.add_section("Epoch-Averaged PSD (Per Channel)", plot=fig_epsd_ch,
+                              plot_caption="Power Spectrum per channel, averaged across Stimulation ON epochs.")
             
         # 9. Stimulation Comparison
         fig_comp = self.create_stim_comparison_plot()
@@ -585,10 +774,13 @@ class EEGVisualizer:
         freq_bands = {
             'Alpha (8-13 Hz)': (8, 13),
             'Beta (13-30 Hz)': (13, 30),
-            'Gamma (30-45 Hz)': (30, 45)
+            'Gamma (30-45 Hz)': (30, 45),
+            'High Gamma (60-100 Hz)': (60, 100),
+            'other (100-200 Hz)': (100, 200)
         }
+        
         for band_name, (fmin, fmax) in freq_bands.items():
-            fig_band = self.create_frequency_band_plot(band_name, fmin, fmax)
+            fig_band = self.create_frequency_band_plot(band_name, fmin, fmax, color_map=color_map)
             if fig_band:
                 report.add_section(f"Frequency Band: {band_name}", plot=fig_band,
                                   plot_caption=f"Power distribution for {band_name}")

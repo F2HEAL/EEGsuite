@@ -99,7 +99,7 @@ python src/analysis/realtime/EEGlslviewer/src/eeg_viewer_main.py
 Run this on the PC connected to the VHP Stimulator.
 
 ```bash
-python -m src.main sweep -d config/hardware/vbs_only.yaml -p config/protocols/sweep_default.yaml
+    python -m src.main sweep -d config/hardware/vbs_only.yaml -p config/protocols/sweep_default.yaml
 ```
 
 ```bash
@@ -136,8 +136,10 @@ Used to isolate neural responses from electromagnetic (EM) interference (e.g., f
 
 ```bash
 # Run the contrast analysis on two files
-python -m src.main contrast --fot data/raw/SUBJECT_FOT.csv --ifnfn data/raw/SUBJECT_IFNFN.csv
+ python -m src.main analyze_contrast   --fot "G:\My Drive\SharedData\data\RAW\260406-1313_None_c6_f42_v100_eeg.fif.gz"   --ifnfn "G:\My Drive\SharedData\data\RAW\260406-1259_None_c5_f42_v100_eeg.fif.gz" --config config\analysis\contrast_42hz.yaml   --output .\reports\pair1-test2
 ```
+The analysis script now processes zipped RAW .fif files.
+
 *   **Result**: Generates a high-precision HTML report in `reports/` containing TFR heatmaps for FOT, IFNFN, and the final **Contrast** ($FOT - IFNFN$).
 *   **Markers**: Requires files recorded with condition-aware markers (1xx for FOT, 2xx for IFNFN).
 *   **Reference**: See `docs/ANALYSIS_TFR_CONTRAST.md` for more details on the 4-step pipeline.

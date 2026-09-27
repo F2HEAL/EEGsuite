@@ -6,20 +6,20 @@
 montage_profile: freg9
 
 # Filtering settings
-fmin: 1.5
-fmax: 100.0
-notch_freqs: [50, 100]
+fmin: 5
+fmax: 200.0
+notch_freqs: [50, 100, 150, 200]
 stim_freq: 42.0
 
 # Visualization defaults
 default_start_time: 0.0
 default_duration: 10.0
-psd_fmin: 1.0
-psd_fmax: 60.0
+psd_fmin: 5.0
+psd_fmax: 200.0
 pick_channels: [T7, C3, T8, FC4, FC3, C4, CP3, CP4, Cz, S1_left, S1_right]               # Channels to show in the entire report [Iz, PO9, PO10, O1]
 
 # ERP settings
-erp_duration: 1.1                 # Length of ERP window in seconds
+erp_duration: 5.0                 # Length of ERP window in seconds
 
 # Report settings
 output_dir: "reports"

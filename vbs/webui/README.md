@@ -1,4 +1,4 @@
-# F2Heal WebUI
+# F2Heal WebUI (updated 2026-09)
 
 ## Overview
 The **F2Heal WebUI** is a web-based interface designed to control and monitor the **VHP (Vibrotactile Haptics Platform)** device. It enables researchers and clinicians to interact with the device via Bluetooth Low Energy (BLE) to deliver precise vibrotactile stimulation for somatosensory research (e.g., SSSEP).
